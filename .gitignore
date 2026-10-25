@@ -10,6 +10,8 @@ __pycache__/
 # Game images (never commit game data)
 *.iso
 *.bin
+*.buzz-pad-bridge.json
+*.buzz-pad-bridge.json.tmp
 
 # OS / IDE
 .vscode/
