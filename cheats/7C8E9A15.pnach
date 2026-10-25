@@ -1,0 +1,56 @@
+gametitle=Buzz! The Schools Quiz (UK) [SCES-54941] Original v2.00
+comment=Buzz! Pad Bridge v0.1.0 - buzzers from the controller port
+
+// Buzzers-not-detected check: always connected
+patch=1,EE,00202A60,word,AC800030
+patch=1,EE,00202A64,word,03E00008
+patch=1,EE,00202A68,word,24020001
+
+// Buzzer poll at 0x275B00 replaced by the controller bridge
+patch=1,EE,00275B00,word,A0800024
+patch=1,EE,00275B04,word,24020001
+patch=1,EE,00275B08,word,AC800058
+patch=1,EE,00275B0C,word,AC820000
+patch=1,EE,00275B10,word,3C08004D
+patch=1,EE,00275B14,word,0000482D
+patch=1,EE,00275B18,word,910C5F21
+patch=1,EE,00275B1C,word,11800002
+patch=1,EE,00275B20,word,950A5F22
+patch=1,EE,00275B24,word,3949FFFF
+patch=1,EE,00275B28,word,910C5FB5
+patch=1,EE,00275B2C,word,11800003
+patch=1,EE,00275B30,word,950A5FB6
+patch=1,EE,00275B34,word,394AFFFF
+patch=1,EE,00275B38,word,012A4825
+patch=1,EE,00275B3C,word,000953C2
+patch=1,EE,00275B40,word,31430001
+patch=1,EE,00275B44,word,00095342
+patch=1,EE,00275B48,word,314A0002
+patch=1,EE,00275B4C,word,006A1825
+patch=1,EE,00275B50,word,000952C2
+patch=1,EE,00275B54,word,314A0004
+patch=1,EE,00275B58,word,006A1825
+patch=1,EE,00275B5C,word,00095242
+patch=1,EE,00275B60,word,314A0008
+patch=1,EE,00275B64,word,006A1825
+patch=1,EE,00275B68,word,00095182
+patch=1,EE,00275B6C,word,314A0030
+patch=1,EE,00275B70,word,006A1825
+patch=1,EE,00275B74,word,00095082
+patch=1,EE,00275B78,word,314A00C0
+patch=1,EE,00275B7C,word,006A1825
+patch=1,EE,00275B80,word,00095200
+patch=1,EE,00275B84,word,314A0100
+patch=1,EE,00275B88,word,006A1825
+patch=1,EE,00275B8C,word,00095180
+patch=1,EE,00275B90,word,314A0200
+patch=1,EE,00275B94,word,006A1825
+patch=1,EE,00275B98,word,00095240
+patch=1,EE,00275B9C,word,314A0C00
+patch=1,EE,00275BA0,word,006A1825
+patch=1,EE,00275BA4,word,3C0A0070
+patch=1,EE,00275BA8,word,006A1825
+patch=1,EE,00275BAC,word,AC830004
+patch=1,EE,00275BB0,word,AC830018
+patch=1,EE,00275BB4,word,03E00008
+patch=1,EE,00275BB8,word,24020001

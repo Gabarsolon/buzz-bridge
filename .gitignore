@@ -1,0 +1,21 @@
+# Build artifacts
+dist/
+build/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+
+# Game images (never commit game data)
+*.iso
+*.bin
+
+# OS / IDE
+.vscode/
+.idea/
+Thumbs.db
+
+# Binaries & Release Archives
+*.exe
+*.zip
