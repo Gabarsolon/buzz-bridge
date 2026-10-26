@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Buzz Web Controller</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div id="join" class="screen">
+    <h1>Buzz!</h1>
+    <p class="sub">Pick your player slot</p>
+    <div id="slots" class="slots"></div>
+    <p id="joinMsg" class="msg"></p>
+  </div>
+
+  <div id="play" class="screen hidden">
+    <div class="topbar">
+      <span id="youAre"></span>
+      <span id="connDot" class="dot"></span>
+    </div>
+    <button id="red" class="buzzer red" data-btn="red">BUZZ</button>
+    <div class="row">
+      <button class="buzzer blue"   data-btn="blue"></button>
+      <button class="buzzer orange" data-btn="orange"></button>
+      <button class="buzzer green"  data-btn="green"></button>
+      <button class="buzzer yellow" data-btn="yellow"></button>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

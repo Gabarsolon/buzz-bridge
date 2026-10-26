@@ -1,0 +1,4 @@
+aiohttp>=3.9
+vgamepad>=0.1.0; sys_platform == "win32"
+evdev>=1.6; sys_platform == "linux"
+pycloudflared>=0.3.0
