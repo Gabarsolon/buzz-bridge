@@ -21,3 +21,14 @@ Thumbs.db
 # Binaries & Release Archives
 *.exe
 *.zip
+
+# PS3 build outputs, private research inputs (signing key sources) and local backups
+ps3/build/
+ps3/research/
+ps3/plugin/build/
+ps3/console_backup/
+*.bak
+*.sprx
+*.prx
+*.pkg
+*.elf

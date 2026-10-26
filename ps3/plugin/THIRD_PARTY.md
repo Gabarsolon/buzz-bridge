@@ -1,0 +1,7 @@
+# Source provenance
+
+`web/index.html`, `web/style.css` and `web/app.js` originate from the user's read-only Gabarsolon/buzz-web-controller project, copyright 2026 Remus Turcu, MIT. The original notice is preserved in `web/LICENSE`; original input hashes are in `web/reference-sha256.json`. Generated `net/web_assets.h` embeds the same adapted files and carries the same notice by reference to this file and `web/LICENSE`.
+
+New source in this plugin is marked SPDX-License-Identifier MIT. The report encoder is an independently written integer-packing implementation; its test separately reproduces the publicly documented RPCS3 per-button expression. USB descriptor values are interoperability data. The HID report descriptor is reconstructed from the public decoded physical capture linked in DESIGN.md, not claimed to be captured from the user's dongle.
+
+`../research/` contains public source snapshots, analysis helpers and derived metadata for evidence. RPCS3 and Linux snapshots remain under their upstream GPL notices; Cobra, HEN, PSL1GHT, webMAN and PS3DK files retain their own upstream terms. They are not all MIT, and this project does not relicense them. No upstream implementation source from `research/` is compiled into the PC library or candidate game SPRX target. The supplied `../game/` directory is private read-only input, excluded from distribution. Full temporary Ghidra/decompiler scratch is removed at handoff; GAME_ANALYSIS.md retains only short excerpts and derived facts.

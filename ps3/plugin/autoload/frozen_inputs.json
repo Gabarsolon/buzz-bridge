@@ -1,0 +1,15 @@
+{
+  "plugin/game/profile.h": "a86e6ab3b5a5503e0f9aeb0108f664cf9e811dce9ecdce3f893c5f2b319ab9de",
+  "plugin/game/native.c": "e001fd917a3c26b501b8e3b21611ad469f4a4e4a05c33a78bead5454529fc804",
+  "plugin/game/cellusbd_adapter.c": "7f62dd87cec91c55d5c047011832276398cc156d39851901dd684346a728f178",
+  "plugin/game/import_hook.c": "e4d4253994982a6e69dc33030f1dc19669ded11879975cf027afee9fdae79578",
+  "plugin/game/format.c": "53b5709c85725bffc1810f9d52013d78e3f3f3fdc0899bf8171bf8e0b6c206fb",
+  "plugin/core/buzz.c": "c00b9047b2ffcc94522d32750d816997b80a41b7d911906642562eb0059aaba3",
+  "plugin/core/usb_model.c": "8efca9f916500bbd756335f0847803be84184c9ca2b82798982091576b9cce64",
+  "plugin/core/websocket.c": "af9289ab2714e5ab0536477d916b0e004755bb84558a5c7c87426f2fbf99d9ec",
+  "plugin/net/server.c": "fe8472cec2bc68cfbee544b39fea01b6066ecd976cf9638c158569b9c67b05bb",
+  "plugin/web/index.html": "22d38767b518fa8ff9250c0ce80b49ba001203f9c0d23d29ba20538ba7fb6f40",
+  "plugin/web/app.js": "6c6ead2b9288f32f63decd48ea0d2a83453208f81f97b8196b1b6c96e31f048b",
+  "plugin/web/style.css": "5be37c880dd4c15659a3673db9ed7e9f8d67601e31daadf3df5987de02047def",
+  "plugin/ps3buzz.cfg": "d3b4ef1666214ca41004e69abe3680742871f0abe0ed2fcd271a0641c62a4137"
+}
