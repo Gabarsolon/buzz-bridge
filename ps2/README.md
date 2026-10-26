@@ -33,7 +33,7 @@ For auto-detected builds the patcher saves `<game.iso>.buzz-pad-bridge.json` bes
 
 ## How to use
 
-Download `buzz-pad-bridge.exe` from the [PS2 release](../../../releases/tag/v0.2.0) (or run `buzz_pad_bridge.py` with Python 3).
+Download `buzz-pad-bridge.exe` from the [v1.0.0 release](../../../releases/tag/v1.0.0) (or run `buzz_pad_bridge.py` with Python 3).
 
 ### PS3
 

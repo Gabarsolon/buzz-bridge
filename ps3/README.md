@@ -18,7 +18,7 @@ A small plugin runs inside the game and presents up to **two virtual Buzz! buzze
 
 ## Install
 
-1. Download `BuzzBridge.pkg` from the [PS3 release](../../../releases/tag/ps3-v1.0.0) and install it from the XMB (**Package Manager → Install Package Files**).
+1. Download `BuzzBridge.pkg` from the [v1.0.0 release](../../../releases/tag/v1.0.0) and install it from the XMB (**Package Manager → Install Package Files**).
 2. Start **Buzz! Bridge** from the XMB and choose **Start for this session**. It installs its files to `/dev_hdd0/plugins/ps3buzz/`, starts a small background helper for this session only and shows the phone address. Nothing is added to the boot list.
 3. Start your Buzz! game (Buzz! buzzers unplugged) and wait at the main menu. After about **30 seconds** the helper loads the plugin into the game and the buzzers are detected.
 4. On phones on the same network open **`http://<PS3-IP>:8420/`** and pick a player. The game's buzzer lights show on the phone.
