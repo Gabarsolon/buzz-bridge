@@ -1,4 +1,6 @@
-# Buzz Web Controller
+# Buzz Web Controller (PCSX2)
+
+Part of [Buzz! Bridge](../README.md). Formerly the separate `buzz-web-controller` repository.
 
 Use phones as Buzz! buzzers for PCSX2, over LAN or over the internet, no
 physical hardware and no PCSX2 patching required.

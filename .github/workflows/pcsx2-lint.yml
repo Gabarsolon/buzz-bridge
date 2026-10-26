@@ -1,8 +1,15 @@
-name: lint
-on: [push, pull_request]
+name: pcsx2-lint
+on:
+  push:
+    paths: ["pcsx2/**", ".github/workflows/pcsx2-lint.yml"]
+  pull_request:
+    paths: ["pcsx2/**", ".github/workflows/pcsx2-lint.yml"]
 jobs:
   syntax-check:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pcsx2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

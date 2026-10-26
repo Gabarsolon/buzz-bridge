@@ -73,4 +73,4 @@ The SELF signing step reads public key files from `research/load10/` (RPCS3's `r
 
 ## Legal
 
-No game data is included. You need your own copy of the game. The phone page comes from [buzz-web-controller](https://github.com/Gabarsolon/buzz-web-controller) (MIT).
+No game data is included. You need your own copy of the game. The phone page comes from the PCSX2 phone controller in [../pcsx2](../pcsx2) (formerly buzz-web-controller, MIT).
