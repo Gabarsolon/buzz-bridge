@@ -5,6 +5,7 @@ PLUGIN=ROOT/'plugin'
 task_tmp=ROOT/'build'/'tmp'; task_tmp.mkdir(parents=True,exist_ok=True)
 test_env=os.environ.copy();test_env.update(TEMP=str(task_tmp),TMP=str(task_tmp),TMPDIR=str(task_tmp))
 commands=[
+ [sys.executable,'-B','plugin/tests/test_self_signing.py'],
  [sys.executable,'-B','tools/test_porting.py'],
  [sys.executable,'-B','plugin/tests/run_autoload.py'],
  [sys.executable,'-B','plugin/tests/run_app_ui.py'],

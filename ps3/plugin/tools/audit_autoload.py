@@ -2,6 +2,7 @@
 import hashlib,json,pathlib,re,struct,subprocess,os,zlib
 from Crypto.Cipher import AES
 from self10 import read
+from self_ecdsa import verify_self
 from verify_native_prx import verify
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 OUT=ROOT/'build';KEYS=ROOT/'research/load10/key_vault.cpp'
@@ -87,7 +88,9 @@ def main():
     assert 'worker,NULL,1100,65536,THREAD_JOINABLE' in src
     assert src.count('buzz_mapi(0x44,')==1 and src.index('buzz_mark_attempt(s);log_line("ATTEMPT')<src.index('buzz_mapi(0x44,')
     app=(ROOT/'plugin/autoload/app.c').read_text()
-    assert app.index('if(buzz_is_hen())')<app.index('if(buzz_install(')
+    assert 'if(buzz_is_hen())platform="HEN detected (untested)";' in app
+    assert 'about 30 seconds' in app and 'about two minutes' not in app
+    assert app.count('present("/dev_usb000/boot_plugins.txt")')==2
     assert app.index('app_ui_init()')<app.index('if(buzz_install(')
     elf=(OUT/'app/BuzzBridge.elf').read_bytes()
     assert b'/dev_hdd0/game/BUZZB0001/USRDIR' in elf and b'/dev_hdd0/game/BUZZP0001' not in elf
@@ -100,6 +103,10 @@ def main():
     assert src.index('if(post_load_log_only)')<src.index('int identified=')
     assert not subprocess.check_output([str(sdk/'ppu/bin/ppu-nm.exe'),'-u',str(OUT/'autoload-native/BuzzBridge')],text=True).strip()
     game=read(OUT/'ps3buzz.sprx',KEYS)
+    for name in ('ps3buzz','ps3buzz_vsh'):
+        assert read(OUT/(name+'.sprx'),KEYS)['header']['key_revision']==10
+        verify_self(OUT/(name+'.sprx'))
+        assert (OUT/(name+'.prx')).read_bytes()==(OUT/'signing-rev1'/(name+'.prx')).read_bytes(), 'Runtime/helper payload changed'
     assert game['elf']==(OUT/'ps3buzz.prx').read_bytes() and all(game['hmac_checks'])
     assert b'ps3buzz 0.9 ENTRY' in game['elf']
     report=dict(result='PASS',helper=helper,helper_self=signed['header'],helper_hmac_checks=signed['hmac_checks'],helper_unresolved=0,helper_process_allocator=False,package=package(),console_tested=False)

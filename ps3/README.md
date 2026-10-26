@@ -13,7 +13,7 @@ A small plugin runs inside the game and presents up to **two virtual Buzz! buzze
 | Buzz!: Quiz World | BCES00644 (01.00) | ✅ |
 | Other PS3 Buzz! versions | — | ❓ tried in "generic" mode, refused if anything does not match. See [PORTING.md](PORTING.md) |
 
-- **Console:** CFW with Cobra (tested: Evilnat 4.92 + webMAN MOD 1.47.48a). **HEN is not supported**: the app detects HEN and refuses to install.
+- **Console:** CFW with Cobra (tested: Evilnat 4.92 + webMAN MOD 1.47.48a). **PS3HEN: should work but is untested.** The plugin files are signed with key revision 0A, as HEN requires (same as webMAN MOD and DS45Pad). If you try it on HEN, please report the result with the logs listed below.
 - **Not yet tested on a PS3:** "Enable at boot". Use "Start for this session" until it is.
 
 ## Install

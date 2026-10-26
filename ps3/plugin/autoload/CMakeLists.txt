@@ -11,6 +11,9 @@ target_link_options(ps3buzz_vsh PRIVATE "-specs=${PS3DK}/ppu/lib/lv2-prx.specs" 
  -Wl,-z,max-page-size=16 "-Wl,-T,${CMAKE_CURRENT_SOURCE_DIR}/../game/native-prx.ld"
  "-Wl,-Map,${CMAKE_BINARY_DIR}/ps3buzz_vsh.map" -Wl,--gc-sections)
 target_link_libraries(ps3buzz_vsh PRIVATE io "${PS3DK}/ppu/lib/lv2-prx-crt.o")
+set_property(TARGET ps3buzz_vsh APPEND PROPERTY LINK_DEPENDS
+ "${CMAKE_CURRENT_SOURCE_DIR}/../tools/sign_native_self.py"
+ "${CMAKE_CURRENT_SOURCE_DIR}/../tools/self_ecdsa.py")
 add_custom_command(TARGET ps3buzz_vsh POST_BUILD
  COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/../tools/native_prx.py"
  "$<TARGET_FILE:ps3buzz_vsh>" "${BUZZ_ROOT}/build/ps3buzz_vsh.prx" --name ps3buzz_vsh

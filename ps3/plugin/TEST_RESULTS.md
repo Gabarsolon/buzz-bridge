@@ -1,6 +1,6 @@
 # PC test results
 
-Executed 2026-10-26T17:57:12.604545+00:00. Working directory: workspace root.
+Executed 2026-10-26T18:34:28.143677+00:00. Working directory: workspace root.
 
 These checks compile/run Windows code only. No PS3, emulator, compiler installation or executable download was used. No pip packages were installed.
 
@@ -19,6 +19,13 @@ Existing MSVC/Windows SDK headers and libraries were discovered automatically by
 ## Commands and captured results
 
 ```text
+python -B plugin/tests/test_self_signing.py
+exit code: 0
+PASS: revision 0A private/public proof; wrong-private rejection; both ECDSA signatures; every section HMAC; exact released payload/layout; header/signature/HMAC/payload tamper rejection.
+
+```
+
+```text
 python -B tools/test_porting.py
 exit code: 0
 BCES00303 PASS: Python + actual C resolver; generic relocation; refusals; SELF + plain/encrypted RAM ISO
@@ -31,7 +38,7 @@ test_own_BCES00347 (__main__.ToolTests.test_own_BCES00347) ... ok
 test_own_BCES00644 (__main__.ToolTests.test_own_BCES00644) ... ok
 
 ----------------------------------------------------------------------
-Ran 5 tests in 24.855s
+Ran 5 tests in 22.770s
 
 OK
 ```

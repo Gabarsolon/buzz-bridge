@@ -14,8 +14,9 @@
 /* GCM renderer and independent watchdog need an ordinary application stack. */
 SYS_PROCESS_PARAM(1100,0x100000);
 static char url[64]="http://<ps3-ip>:8420/";
+static const char *platform="CFW/Cobra";
 static void info(const char *status)
-{char msg[900];app_log("status: %s",status);snprintf(msg,sizeof(msg),"Buzz! Bridge\n%s\n\nPhone URL (available in supported game):\n%s",status,url);(void)app_dialog(msg,0);}
+{char msg[900];app_log("status: %s",status);snprintf(msg,sizeof(msg),"Buzz! Bridge (%s; signing rev 0A)\n%s\n\nPhone URL (available in supported game):\n%s",platform,status,url);(void)app_dialog(msg,0);}
 static int present(const char *path) {struct stat st;return !stat(path,&st);}
 static int touch_disable(void)
 {
@@ -40,17 +41,15 @@ static int session(char *message,size_t cap)
  app_stage("load session helper enter");
  int rc=buzz_load_vsh(free_slot,BUZZ_HELPER);
  app_log("load session helper slot=%u result=%08x",free_slot,(unsigned)rc);
- snprintf(message,cap,"Session helper slot %u: result %08x.\n%s",free_slot,(unsigned)rc,rc?"No retry in this session; reboot before retrying.":"Return to XMB, launch a supported original Buzz! title and wait at its menu for about two minutes. Restart the PS3 before launching another game in this trial.");
+ snprintf(message,cap,"Session helper slot %u: result %08x.\n%s",free_slot,(unsigned)rc,rc?"No retry in this session; reboot before retrying.":"Return to XMB, launch a supported original Buzz! title and wait at its menu for about 30 seconds. Restart the PS3 before launching another game in this trial.");
  return rc? -1:0;
 }
 int main(void)
 {
  if(app_ui_init()){app_ui_exit(1);return 1;}
- app_stage("platform check: CFW/Cobra");
- if(buzz_is_hen()) {
-  info("CFW/Cobra build only. This helper uses APP key revision 1.\nPublished HEN guidance requires revision 0A; session/boot setup is refused.\nNo plugin files or boot list changed.");
-  app_ui_exit(1);return 1;
- }
+ if(buzz_is_hen())platform="HEN detected (untested)";
+ app_log("platform: %s; signing rev 0A",platform);
+ app_stage("platform check complete");
  app_stage("network init enter (IP lookup only)");
  int net_module=cellSysmoduleLoadModule(CELL_SYSMODULE_NET)==0;
  int ctl_module=cellSysmoduleLoadModule(CELL_SYSMODULE_NETCTL)==0;
@@ -69,7 +68,7 @@ int main(void)
  app_stage("install complete: all three payloads verified and activated");
  if(app_exiting())goto finish;
  if(!was_disabled && unlink(BUZZ_DISABLE)) {info("Installed, but disable file could not be cleared.");goto finish;}
- snprintf(message,sizeof(message),"Buzz! Bridge\nPhone URL (in supported game): %s\n\nStart for this session?\nYes: start helper, then exit to XMB.\nNo: boot options. Circle: exit.\n\nBoot files are unchanged by session start.",url);
+ snprintf(message,sizeof(message),"Buzz! Bridge (%s; signing rev 0A)\nPhone URL (in supported game): %s\n\nStart for this session?\nYes: start helper, then exit to XMB.\nNo: boot options. Circle: exit.\n\nBoot files are unchanged by session start.",platform,url);
  int choice=app_dialog(message,1);
  app_log("choice session=%d",choice);
  if(choice==CELL_MSGDIALOG_BUTTON_YES) {
@@ -86,7 +85,7 @@ int main(void)
   app_log("boot edit result=%d %s",rc,message);
   if(rc>=0) {
    if(present(BUZZ_DISABLE)&&unlink(BUZZ_DISABLE))snprintf(message,sizeof(message),"Boot line installed, but disable file remains. Start session after fixing permissions.");
-   else snprintf(message,sizeof(message),"Boot helper enabled%s.\nRestart after your session test. Hold R2 through XMB startup to skip.\nBackup: boot_plugins.txt.ps3buzz.bak",rc?"":" (already configured)");
+   else snprintf(message,sizeof(message),"Boot helper enabled%s.\nRestart after your session test; on HEN, activate HEN to load. Hold R2 through helper startup to skip.\nBackup: boot_plugins.txt.ps3buzz.bak",rc?"":" (already configured)");
   }
   info(message);goto finish;
  }
@@ -94,6 +93,7 @@ int main(void)
  choice=app_dialog("Disable Buzz! Bridge at boot?\nYes: remove only this helper's lines, keep a backup, and create its disable file.\nNo / Circle: leave boot settings unchanged and exit.",1);
  app_log("choice disable_boot=%d",choice);
  if(choice==CELL_MSGDIALOG_BUTTON_YES) {
+  if(present("/dev_usb000/boot_plugins.txt")||present("/dev_usb001/boot_plugins.txt")) {info("USB boot list detected. HDD boot changes refused; unplug that USB and retry.");goto finish;}
   if(touch_disable()) {info("Cannot create disable file. Boot list left unchanged.");goto finish;}
   app_stage("boot edit enter");
   int rc=buzz_edit_boot_file(BUZZ_BOOT,0,message,sizeof(message));

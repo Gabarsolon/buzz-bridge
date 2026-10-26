@@ -1,12 +1,13 @@
 """Normalize installed make_self's APP profile and recompute its signature.
 
-Uses the existing rev-1 APP key and the public geohot signing constants in
-source text saved under research/load10. No keys are emitted in reports.
-This keeps the installed SDK read only; it does not relabel encrypted keys.
+Uses make_self packing, then APP rev 0A root encryption and ECDSA signing.
+The private/public curve proof is mandatory before invoking the SDK signer.
+No keys are emitted in reports; the installed SDK remains read only.
 """
 import argparse, hashlib, os, pathlib, re, struct, subprocess
 from Crypto.Cipher import AES
 from self10 import read,app_key,ctr
+from self_ecdsa import prove, sign_digest, verify_self
 ROOT=pathlib.Path(__file__).resolve().parents[2]
 SDK=pathlib.Path(os.environ.get('PS3DK',r'E:\tools\ps3dk\ps3-sdk-v0.26.0-windows-x86_64'))
 ENV=os.environ.copy()
@@ -27,6 +28,7 @@ def scalar(header,offset):
 
 def sign(source,output,fake=False,vsh=False):
     source=pathlib.Path(source);output=pathlib.Path(output)
+    if not fake: prove(10)
     subprocess.run([str(SDK/'bin'/('fself.exe' if fake else 'make_self.exe')),str(source),str(output)],env=ENV,cwd=ROOT,check=True)
     keys=ROOT/'research/load10/key_vault.cpp';original=read(output,keys)
     data=bytearray(original['data']);info=original['header'];ext=info['extended_header']
@@ -65,23 +67,20 @@ def sign(source,output,fake=False,vsh=False):
     optional=mo+64+32+48*nsec+16*nkey
     assert opt==48 and struct.unpack_from('>II',header,optional)==(1,48)
     header[optional+16:optional+48]=bytes(16)+struct.pack('>QII',0x7b,1,0x20000)
-    r,s=scalar(header,offset)
+    struct.pack_into('>H',header,8,10)
+    r,s=sign_digest(10,hashlib.sha1(header[:offset]).digest())
     header[offset:offset+21]=r.to_bytes(21,'big')
     header[offset+21:offset+42]=s.to_bytes(21,'big')
     data[:mo]=header[:mo]
+    rootkey,rootiv=app_key(keys,10)
     data[mo:mo+64]=AES.new(rootkey,AES.MODE_CBC,rootiv).encrypt(mi)
     data[mo+64:hs]=ctr(mi[:16],mi[32:48],header[mo+64:hs])
     output.write_bytes(data)
     result=read(output,keys)
     assert all(result['hmac_checks']) and result['elf']==original['elf']
-    assert result['header']['key_revision']==1
-    # Internal algebra consistency is deliberately distinguished from a full
-    # curve/public-key ECDSA verification in the audit/report.
-    check=bytearray(result['data'][:hs]);check[mo:mo+64]=mi;check[mo+64:]=result['meta_plain']
-    cr,cs=scalar(check,offset)
-    assert int.from_bytes(check[offset:offset+21],'big')==cr
-    assert int.from_bytes(check[offset+21:offset+42],'big')==cs
-    print('APP SELF normalized: revision/key unchanged; '+('VSH authority/control flags' if vsh else 'game authority/zero control flags')+', ELF digest, APP capabilities, fixed-width signature.')
+    assert result['header']['key_revision']==10
+    verify_self(output)
+    print('APP SELF signing rev 0A: private/public proof, all HMACs, ELF identity and public-key ECDSA PASS; '+('VSH authority/control flags' if vsh else 'game authority/zero control flags')+'.')
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('source');p.add_argument('output');p.add_argument('--fake',action='store_true');p.add_argument('--vsh',action='store_true')

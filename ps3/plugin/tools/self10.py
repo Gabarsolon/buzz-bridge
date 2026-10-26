@@ -61,8 +61,8 @@ def decode(data, key_file):
     elf[phoff:phoff+56*phnum]=data[po:po+56*phnum]
     if so and shnum: elf[shoff:shoff+shnum*shent]=data[so:so+shnum*shent]
     for off,size,stype,index,hashed,sha,enc,ki,ii,comp in sections:
-        # Retail metadata can also describe section headers (type 1).
-        # Their table was copied from the SELF header above; only type 2 maps PT_LOADs.
+        # Retail metadata can also describe section headers and other records.
+        # Only type 2 maps PT_LOADs; this reader authenticates those segments.
         if stype!=2: continue
         assert index<len(ph) and off+size<=len(data)
         blob=data[off:off+size]
@@ -70,6 +70,7 @@ def decode(data, key_file):
             assert ki<len(keys) and ii<len(keys)
             blob=ctr(keys[ki],keys[ii],blob)
         if hashed==2:
+            assert sha+6<=len(keys), 'Incomplete HMAC key table'
             expected=b''.join(keys[sha:sha+2])[:20]
             hkey=b''.join(keys[sha+2:sha+6])
             checks.append(hmac.compare_digest(hmac.new(hkey,blob,hashlib.sha1).digest(),expected))
