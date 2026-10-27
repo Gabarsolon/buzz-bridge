@@ -1,0 +1,25 @@
+/* ps2sdk import-table convention: Copyright ps2dev - http://www.ps2dev.org
+ * Licensed under Academic Free License version 2.0; see ../licenses/AFL-2.0.txt.
+ * Import selection changed for Buzz! Bridge, Copyright (c) 2026 Gabarsolon, MIT. */
+loadcore_IMPORTS_start
+I_GetLoadcoreInternalData
+I_FlushIcache
+I_RegisterLibraryEntries
+I_ReleaseLibraryEntries
+loadcore_IMPORTS_end
+
+intrman_IMPORTS_start
+I_CpuSuspendIntr
+I_CpuResumeIntr
+intrman_IMPORTS_end
+
+thbase_IMPORTS_start
+I_CreateThread
+I_DeleteThread
+I_StartThread
+I_DelayThread
+thbase_IMPORTS_end
+
+stdio_IMPORTS_start
+I_printf
+stdio_IMPORTS_end

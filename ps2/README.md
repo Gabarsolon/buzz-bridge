@@ -1,78 +1,155 @@
-# Buzz! Pad Bridge
+# Buzz! Bridge PS2
 
-Play **Buzz! games** (PS2) with your **real Buzz! buzzers on a PS3 slim or super slim**, through the PS3's built-in PS2 emulation.
+Play PS2 **Buzz!** games using DualShock controllers, or try real wired Buzz! buzzers through the PS3's `ps2_netemu` controller mapping. Up to four players can share two controllers.
 
-The PS2 software emulator that every PS3 slim and super slim uses (`ps2_netemu`) does not pass the Buzz! USB dongle through to the game. It turns the dongle into a DualShock controller instead, so the game says *"Buzz! buzzers are not detected. Please insert the Buzz! buzzers into a USB connector"* and never gets past that screen. This tool patches **your own copy** of the game so it reads the buzzers from that controller.
+The universal patcher replaces the game's `USBD.IRX` with our **15,457-byte `bbusbd.irx`**. It presents a virtual wired Buzz! dongle (`054C:0002`) to the game's own, unmodified `BUZZER.IRX`. Controller ports 1 and 2 supply the buttons. No game executable addresses or per-game cheats are needed.
 
-It is a game patch only. Nothing on the PS3 is modified (no `ps2_netemu.self` or dev_flash changes).
+## Status
 
-## Status (v0.2.0)
+These are **user-reported tests of the universal module in PCSX2 v2.8.2**, supplied during integration. The integration checks use synthetic ISOs and native unit tests; no emulator or console was run during integration. Recognising a USBD version does not establish that a game works.
 
-- ✅ Schools Quiz works on a real PS3 (CECH-25xx, Evilnat 4.92 CFW + Cobra, ISO mounted with webMAN) with real wired buzzers: **2 players** (handsets 1 and 2).
-- ✅ Schools Quiz works in PCSX2 with a normal controller.
-- ✅ Mega Quiz works in PCSX2 with a normal controller (found by auto-detection). Not yet tested on a PS3.
-- ❓ PS3 HEN: untested. It should work because nothing but the game is patched. HEN cannot run PS2 ISOs directly: patch the ISO first, then convert it to a PS2 Classic (`.BIN.ENC` / `.pkg`, e.g. with PS2 Classics GUI).
-- ❌ Handsets 3 and 4: `ps2_netemu` only passes 10 of the 20 buzzer buttons to the game. See [PLAN.md](PLAN.md) for how 4 players will work.
-- ❌ Buzzer lights stay off.
+| Game | Universal module in PCSX2 | Universal module on PS3 CFW / HEN |
+|---|---|---|
+| Buzz! The Schools Quiz (Relentless driver) | Working: scripted demo and `two_ds_shared` | Untested / untested |
+| Buzz! Junior: Jungle Party (Junior driver) | Working: scripted demo and `two_ds_shared` with `--poll auto` | Untested / untested |
+| Buzz! The Mega Quiz | Untested | Untested / untested |
+| Buzz! Junior: Ace Racers | Working: `two_ds_shared` with `--poll auto` (the game reads no controllers itself) | Untested / untested |
+| Buzz! Junior: Dino Den | Working: `two_ds_shared` with `--poll auto` (the game reads no controllers itself) | Untested / untested |
+| Buzz! Junior: Monster Rumble | Working: `two_ds_shared` with `--poll auto` (the game reads no controllers itself) | Untested / untested |
+| Buzz! Junior: RoboJam | Working: `two_ds_shared` with `--poll auto` (the game reads no controllers itself) | Untested / untested |
+| Other games, regions and editions | Untested; unknown USBD versions are refused | Untested / untested |
 
-## Verified and auto-detected versions
+The older **EE game-code patcher** is preserved under [legacy/](legacy/). Its earlier Schools Quiz PS3 result and Mega Quiz PCSX2 result do **not** validate the universal module on those platforms. See [legacy/README.md](legacy/README.md) for that tool's mappings, limits and in-place restore.
 
-| Version | Status |
-|---|---|
-| Schools Quiz (UK), `SCES_549.41`, Original v2.00 | Verified on PS3/PCSX2; original 50 words checked against `GAMES` |
-| Mega Quiz (Europe, En/Fr/Nl), `SCES_545.05` | Auto-detected; **works in PCSX2**, PS3 untested |
-| Other games, regions and editions, including Classroom Edition v1.00 | Detection attempted; accepted only if every required signature is unique and all structure checks pass |
+## Patch your ISO
 
-The Schools Quiz reference has Redump SHA-1 `b3862f09cf0be9caa1ccf88dae5ab8de6691b31b` and volume label `BUZZLRN`. `GAMES` remains the list of versions verified on hardware/PCSX2. Auto-detection does not add entries to it.
+Use your own **unpatched, plain ISO** (2048-byte sectors). If you previously used the legacy tool, restore its EE changes with that tool first, or start from an original ISO.
 
-Give the patcher any PS2 Buzz! ISO: it reads the boot ELF, locates the observed Relentless buzzer/pad code family and derives the addresses. An unknown build prints **UNTESTED**. A missing/duplicate signature, changed instruction, inconsistent layout or short poll causes refusal before patching. Different game engines or compiler layouts may require extending the detector; this is not evidence that every Buzz! release works.
+1. Drag one ISO onto **`buzz-bridge-ps2.exe`**, or double-click the exe and drag the ISO into its prompt. **Extract ZIP archives first**: dragging a file from Explorer's ZIP view can pass an invalid temporary path. The exe embeds the module; no Python or separate IRX is needed.
+2. Check **Your game** (volume, USBD driver version and ISO size), then answer **What do you have?** in **Your setup** using the five choices below. The patcher shows the selected setup's controller button table.
+3. **Patching** starts immediately after your choice, with a live copy bar showing percent, MB/s and ETA, followed by module writing and verification. Wait for **Done** / `Patched:`. The default output is **`<name> (Buzz Bridge).iso` beside the input**. The input stays unchanged. Existing output and recovery files are never overwritten.
+4. Keep **`<patched ISO>.usbd.orig`** and **`<patched ISO>.bbpatch.json`** beside that patched ISO for restoration. They contain a local backup of your original USBD and checksums. Do not upload them with a bug report.
 
-For auto-detected builds the patcher saves `<game.iso>.buzz-pad-bridge.json` beside the ISO **before writing it**. Keep this recovery sidecar with that ISO: it preserves the original words for `--check`, interrupted-patch recovery and `--restore`. A patched unknown build without its sidecar is refused. Known verified builds need no sidecar. Read-only `--check` creates no files.
+The patcher checks free disk space before copying. Allow space for a complete ISO plus small recovery files. `--poll auto` is the default: the module observes the game's pad reads and reads the pads itself when the game does not. BBUSB logging is on by default.
 
-[docs/PORTING.md](docs/PORTING.md) documents the detector, disassembly evidence, limits, and manual research fallback. `tools/new_game.py "My Buzz Game.iso" --out .` inspects an original ISO and generates a PCSX2 test cheat without modifying it. Bundled cheats: `cheats/7C8E9A15.pnach` (Schools Quiz) and `cheats/175AAA90.pnach` (Mega Quiz).
+The console uses buzzer colours when the terminal supports them. Set `NO_COLOR` to disable colour; redirected output stays plain and omits the live bar. Double-click and drag-drop launches pause at the end so you can read the result. **Done** includes short PCSX2 / PS3 CFW / HEN instructions and an Undo command. The patcher reads back the written module and both recovery files before reporting success.
 
-## How to use
+Example progress (the copy bar refreshes on one line):
 
-Download `buzz-pad-bridge.exe` from the [v1.0.0 release](../../../releases/tag/v1.0.0) (or run `buzz_pad_bridge.py` with Python 3).
+```text
+3 / Patching
+------------------------------------------------------------
+Patching the ISO now. Please keep this window open.
+Output: C:\Games\My Game (Buzz Bridge).iso
+Copying the ISO (3.80 GB); large games can take a few minutes ...
+Copying ISO [############------------]  50%    95.0 MB/s  ETA 00:20
+Flushing ISO copy to disk ... done
+Writing Buzz! Bridge module ... done
+Saving recovery files ... done
+Verifying ... done
+Finishing patched ISO ... done
 
-### PS3
-
-1. Drag your Buzz! ISO onto `buzz-pad-bridge.exe`. It patches the ISO in place (about 200 bytes).
-2. Copy the ISO to `/dev_hdd0/PS2ISO/` on the PS3.
-3. Plug in the Buzz! buzzers, mount the game with webMAN and start it with your DualShock 3.
-4. Once the game is running, **turn the DualShock 3 off** (hold PS → Turn Off Controller). Its buttons would otherwise count as buzzer presses.
-
-### PCSX2
-
-- Either load the patched ISO, or keep it original and enable its matching cheat in your PCSX2 `cheats` folder. Bundled: `cheats/7C8E9A15.pnach` (Schools Quiz), `cheats/175AAA90.pnach` (Mega Quiz). For another auto-detected build, generate its cheat with `tools/new_game.py`.
-- In Settings → Controllers, set both **USB ports to None** and use a normal controller as pad 1, with the mapping below.
-
-### Controller mapping
-
-On the PS3 this happens automatically for the real buzzers. With a controller (PCSX2, or a DualShock on the PS3) the buttons are:
-
-| Controller | Buzzer |
-|---|---|
-| □ / ✕ / ○ / △ / L1 | Player 1: red / yellow / green / orange / blue |
-| R1 / L2 / R2 / Select / Start | Player 2: red / yellow / green / orange / blue |
-
-### Undo
-
-```
-buzz-pad-bridge.exe "Buzz! The Schools Quiz (Europe).iso" --restore
+4 / Done
 ```
 
-`--check` reports whether an ISO is patched without changing it.
+To run from source, install nothing: Python 3.9+ and the files in this folder are enough. Run commands from `ps2/`:
 
-## How it works
+```powershell
+python buzz_bridge_ps2.py "My Game.iso"
+python buzz_bridge_ps2.py "My Game.iso" --layout two_ds_shared
+python buzz_bridge_ps2.py "My Game.iso" --layout 1 --out "My custom copy.iso"
+python buzz_bridge_ps2.py "My Game.iso" --layout buzzers --in-place
+python buzz_bridge_ps2.py "My Game (Buzz Bridge).iso" --info
+python buzz_bridge_ps2.py "My Game (Buzz Bridge).iso" --restore
+```
 
-- The detected "buzzers not detected" check (Schools Quiz EE `0x202A60`) always reports the buzzers as connected.
-- The detected buzzer poll (Schools Quiz EE `0x275B00`), which normally asks the IOP buzzer driver for USB reports, is replaced by a bridge. It reads both controller ports, translates the buttons with `ps2_netemu`'s own Buzz!→DualShock layout back into buzzer bits, and writes them where the game expects the buzzer report. That includes the handset-present flags (bits 20–22) the menus check before reading a button.
+Use the same arguments with `buzz-bridge-ps2.exe`. `--layout` avoids the setup prompt; invocations with flags do not pause on exit. `--in-place` explicitly modifies the input and writes its recovery files first. **`--restore` modifies the ISO you name in place**, restores only its USBD extent, and retains recovery files. Move the ISO and both recovery files together; their backup paths are relative. For a different layout after restoration, keep an original ISO and choose a new output name.
 
-## Legal
+If recovery files are lost, an unchanged original of the same ISO can supply the original USBD:
 
-No game data is included. You need your own copy of the game.
+```powershell
+python buzz_bridge_ps2.py "My Game (Buzz Bridge).iso" --restore --from-iso "My Game.iso"
+```
 
-## License
+Restoration refuses wrong checksums, changed extents and unrelated USBD edits. Recovery files also allow an interrupted extent write to be restored. Do not use another patcher on the same USBD. An unknown USBD hash is refused with a reportable SHA-1; there is no force option. `--info` is read-only and can inspect unknown versions.
 
-MIT, see [LICENSE](LICENSE).
+## Setups and controller buttons
+
+Menu choices are **1–5**. CLI layout IDs are **0–4**:
+
+| Menu | CLI ID / name | Controller port 1 | Controller port 2 | Players |
+|---|---|---|---|---|
+| 1. Buzz! buzzers only | `0` / `buzzers` | PS3-mapped wired dongle: handsets 1–2 | Unused | 2 |
+| 2. Buzz! buzzers + 1 DualShock (4 players) | `1` / `buzzers_ds` | PS3-mapped wired dongle: handsets 1–2 | Split: players 3–4 | 4 |
+| 3. 2 DualShocks, 2 players each (4 players) | `2` / `two_ds_shared` | Split: players 1–2 | Split: players 3–4 | 4 |
+| 4. 2 DualShocks, 1 player each | `3` / `two_ds_single` | Whole controller: player 1 | Whole controller: player 2 | 2 |
+| 5. 1 DualShock, 2 players | `4` / `one_ds_shared` | Split: players 1–2 | Unused | 2 |
+
+**Shared DualShock:** the left half belongs to the first player on that port, the right half to the second. Shapes below refer to the buttons printed on the controller:
+
+| Buzz! button | Left half | Right half |
+|---|---|---|
+| 🔴 Red (buzz) | **L1 or L2** | **R1 or R2** |
+| 🔵 Blue | **↑ Up** | **△ Triangle** |
+| 🟠 Orange | **← Left** | **□ Square** |
+| 🟢 Green | **→ Right** | **○ Circle** |
+| 🟡 Yellow | **↓ Down** | **× Cross** |
+
+For `two_ds_single`, each player can use either half of their own controller: both columns trigger the same player. Analog sticks, L3 and R3 are unused.
+
+**Real wired buzzers on PS3:** `ps2_netemu` turns one dongle into one DualShock. Only handsets **1 and 2** reach this bridge through that mapping; handsets 3 and 4 on that dongle remain unavailable. Layout 1 adds players 3 and 4 using a separate controller. For reference, the dongle-to-pad translation is:
+
+| Buzz! button | Handset 1 on port 1 | Handset 2 on port 1 |
+|---|---|---|
+| Red | □ Square | R1 |
+| Blue | L1 | Start |
+| Orange | △ Triangle | Select |
+| Green | ○ Circle | R2 |
+| Yellow | × Cross | L2 |
+
+These two layouts are intended for the PS3 mapping; universal-module PS3 testing is still pending. On PCSX2, use a DualShock layout for ordinary controllers.
+
+## PCSX2
+
+1. Patch a clean ISO and select a controller layout, usually menu choice 3 (`two_ds_shared`).
+2. In **Settings → Controllers**, set **both USB ports to Not Connected**. The patched game gets its dongle from the module inside the ISO.
+3. Configure **controller port 1** as a DualShock 2. Configure **controller port 2** as a second DualShock 2 for layouts 1–3 (CLI IDs). Bind the buttons in the table above. For one shared controller, only port 1 is needed.
+4. **Disable old Buzz! cheats**, including legacy `7C8E9A15.pnach` (Schools Quiz) and `175AAA90.pnach` (Mega Quiz). Remove/disable any other EE patch for this game.
+5. Boot the **patched copy** from a fresh start. Do not resume a save state created with the old ISO/module.
+
+For Jungle Party, keep the default `--poll auto`. If an older prototype ISO used polling off, patch a fresh original with this tool.
+
+## PS3 with CFW
+
+This is a test procedure; the universal module has **not yet been verified on ps2_netemu**.
+
+1. Patch the ISO on the PC. Choose the setup matching your buzzers/controllers.
+2. Copy the **patched ISO** to **`/dev_hdd0/PS2ISO/`** on the PS3.
+3. Mount it with **webMAN** and start the mounted game through your usual PS2 launcher.
+4. Assign controllers to ports 1 and 2 as the layout requires. For wired buzzers, the dongle's mapped controller must be port 1; the additional shared DualShock must be port 2 for layout 1. Controller assignment is part of the pending PS3 test.
+
+No PS3 system or emulator files are patched. The virtual USBD does not pass through other USB devices; buzzer lights and EyeToy are not provided.
+
+## PS3 with HEN
+
+HEN is **untested** with the universal module. Patch the ISO **first on the PC**, then convert that patched ISO to a **PS2 Classic** (`.BIN.ENC` / `.pkg`) using your existing conversion workflow. Install/start it using your usual PS2 Classics launcher. Keep the patched ISO and recovery files on the PC; the patcher cannot patch or restore the encrypted Classic directly.
+
+## Report a problem
+
+Include the game title, serial, region/edition, platform (PCSX2 version or PS3 model/CFW/HEN), selected layout, polling mode, full patcher output and `--info` output. Describe what worked: startup, virtual dongle detection, each controller port, each player's five buttons, and releases after a held button.
+
+For PCSX2 **v2.8.2**:
+
+1. Before booting, enable **Debug → Enable IOP Console Logging**.
+2. Ensure file logging is enabled, boot the patched ISO and reproduce the problem.
+3. In PCSX2's data folder, open **`logs\emulog.txt`**. Include the **`BBUSB:`** startup/status lines and nearby errors. If the file has no BBUSB lines, report that too and confirm you booted the patched copy.
+
+Logging is enabled in the module unless you patched with `--quiet`. Diagnostic flags `--script-demo`, `--no-pad` and `--poll always` are for investigation; report them if used. Do not attach ISOs, game ELFs/IRXs, recovery backups or other game data.
+
+## Development and licensing
+
+[docs/PORTING.md](docs/PORTING.md) explains the module approach and version checks. [universal/TOOLCHAIN.md](universal/TOOLCHAIN.md) documents source/IRX builds, tests and the PyInstaller exe build.
+
+If the exe is open, the build script reports the lock without stopping any process. You can build a separate review copy with `ps2\build_exe.ps1 -DistPath build\console-preview` (the output path is relative to `ps2/`) and test it with `python ps2/tests/smoke_exe.py --exe ps2/build/console-preview/buzz-bridge-ps2.exe` from the repository root.
+
+Our code is MIT ([root license](../LICENSE)). ps2sdk-derived code carries **Academic Free License 2.0** notices; the OPL hook reference carries AFL 3.0 attribution. See [universal/THIRD_PARTY.md](universal/THIRD_PARTY.md) and the included license texts for scope and source references. No Sony modules or game data are distributed.

@@ -12,6 +12,12 @@ __pycache__/
 *.bin
 *.buzz-pad-bridge.json
 *.buzz-pad-bridge.json.tmp
+*.bbpatch.json
+*.usbd.orig
+*.partial
+ps2/universal/obj/
+ps2/universal/*.notiopmod.elf
+ps2/universal/*.notiopmod.stripped.elf
 
 # OS / IDE
 .vscode/

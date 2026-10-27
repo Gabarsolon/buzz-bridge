@@ -1,0 +1,24 @@
+/* ps2sdk usbd export ABI: Copyright ps2dev - http://www.ps2dev.org
+ * Licensed under Academic Free License version 2.0; see ../licenses/AFL-2.0.txt.
+ * Kept in the same order for the virtual implementation; see ../THIRD_PARTY.md. */
+DECLARE_EXPORT_TABLE(usbd, 1, 2)
+DECLARE_EXPORT(_start)
+DECLARE_EXPORT(_retonly)
+DECLARE_EXPORT(usbdReboot)
+DECLARE_EXPORT(_retonly)
+DECLARE_EXPORT(sceUsbdRegisterLdd)
+DECLARE_EXPORT(sceUsbdUnregisterLdd)
+DECLARE_EXPORT(sceUsbdScanStaticDescriptor)
+DECLARE_EXPORT(sceUsbdSetPrivateData)
+DECLARE_EXPORT(sceUsbdGetPrivateData)
+DECLARE_EXPORT(sceUsbdOpenPipe)
+DECLARE_EXPORT(sceUsbdClosePipe)
+DECLARE_EXPORT(sceUsbdTransferPipe)
+DECLARE_EXPORT(sceUsbdOpenPipeAligned)
+DECLARE_EXPORT(sceUsbdGetDeviceLocation)
+DECLARE_EXPORT(sceUsbdRegisterAutoloader)
+DECLARE_EXPORT(sceUsbdUnregisterAutoloader)
+DECLARE_EXPORT(sceUsbdChangeThreadPriority)
+DECLARE_EXPORT(sceUsbdGetReportDescriptor)
+DECLARE_EXPORT(sceUsbdMultiIsochronousTransfer)
+END_EXPORT_TABLE
