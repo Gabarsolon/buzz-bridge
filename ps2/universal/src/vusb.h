@@ -56,12 +56,14 @@ typedef struct vu_ldd {
 #define VU_RC_ABORTED 0x122
 
 #define VU_DEVID 1
+#define VU_DEVID2 2 /* second virtual dongle (layouts with two dongles) */
+#define VU_MAXDEV BB_DONGLES
 #define VU_TICK_MS 4
 
 typedef struct {
     uint32_t ctl_xfers, ctl_stalls, in_delivered, aborted, lights_updates, bad_args;
-    uint8_t lights[BB_OUT_REPORT_LEN]; /* last SET_REPORT payload */
-    uint8_t last_report[BB_REPORT_LEN];
+    uint8_t lights[VU_MAXDEV][BB_OUT_REPORT_LEN]; /* last SET_REPORT payload of each dongle */
+    uint8_t last_report[VU_MAXDEV][BB_REPORT_LEN];
 } vusb_stats_t;
 
 /* configuration is copied here: attach delay and heartbeat in ms, layout for the pad mapping */
@@ -84,6 +86,7 @@ void vusb_tick(void);
 /* test / policy hooks */
 void vusb_detach(void);
 const vusb_stats_t *vusb_stats(void);
-int vusb_is_ready(void);
+int vusb_is_ready(void);          /* first dongle */
+int vusb_dongles(void);           /* how many virtual dongles this layout presents */
 
 #endif

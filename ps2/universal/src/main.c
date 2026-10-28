@@ -162,16 +162,20 @@ static void worker(void *arg)
         tick++;
         if (verbose && (tick % STATUS_TICKS) == 0) {
             const vusb_stats_t *st = vusb_stats();
-            if (st->in_delivered != last_in || bbpad_hook_calls() != last_calls || bbpad_poll_count() != last_polls) {
+            if (st->in_delivered != last_in || bbpad_hook_calls() != last_calls || (bbpad_poll_count() + bbpad_tap_cycles()) != last_polls) {
                 last_in = st->in_delivered;
                 last_calls = bbpad_hook_calls();
-                last_polls = bbpad_poll_count();
-                printf("BBUSB: status sio2=%d calls=%u padev=%u polls=%u%s reports=%u ctl=%u stall=%u lights=%02x%02x%02x%02x rep=%02x%02x%02x%02x%02x\n",
+                last_polls = bbpad_poll_count() + bbpad_tap_cycles();
+                printf("BBUSB: status sio2=%d calls=%u padev=%u polls=%u%s taps=%u cyc=%u reports=%u ctl=%u stall=%u lights=%02x%02x%02x%02x rep=%02x%02x%02x%02x%02x\n",
                        bbpad_state(), bbpad_hook_calls(), bbpad_pad_events(), bbpad_poll_count(),
-                       bbpad_polling() ? "(on)" : "", st->in_delivered, st->ctl_xfers,
-                       st->ctl_stalls, st->lights[1], st->lights[2], st->lights[3], st->lights[4],
-                       st->last_report[0], st->last_report[1], st->last_report[2], st->last_report[3],
-                       st->last_report[4]);
+                       bbpad_polling() ? "(on)" : "", bbpad_tap_mask(), bbpad_tap_cycles(), st->in_delivered, st->ctl_xfers,
+                       st->ctl_stalls, st->lights[0][1], st->lights[0][2], st->lights[0][3], st->lights[0][4],
+                       st->last_report[0][0], st->last_report[0][1], st->last_report[0][2], st->last_report[0][3],
+                       st->last_report[0][4]);
+                if (vusb_dongles() > 1)
+                    printf("BBUSB: status dongle2 lights=%02x%02x%02x%02x rep=%02x%02x%02x%02x%02x\n", st->lights[1][1], st->lights[1][2],
+                           st->lights[1][3], st->lights[1][4], st->last_report[1][0], st->last_report[1][1],
+                           st->last_report[1][2], st->last_report[1][3], st->last_report[1][4]);
             }
         }
         DelayThread(VU_TICK_MS * 1000);
@@ -191,6 +195,7 @@ int _start(int ac, char *av[], void *startaddr, ModuleInfo_t *mi)
 
     flags = bb_cfg.flags;
     vusb_init(bb_cfg.attach_delay_ms, bb_cfg.heartbeat_ms, bb_cfg.layout, flags);
+    bbpad_configure(bb_cfg.layout, flags);
 
     th.attr = TH_C;
     th.thread = worker;
@@ -210,7 +215,8 @@ int _start(int ac, char *av[], void *startaddr, ModuleInfo_t *mi)
         DeleteThread(tid);
         return MODULE_NO_RESIDENT_END;
     }
-    if ((flags & (BB_FLAG_POLL_AUTO | BB_FLAG_POLL_ALWAYS)) && !(flags & (BB_FLAG_NOPAD | BB_FLAG_SCRIPT))) {
+    if (((flags & (BB_FLAG_POLL_AUTO | BB_FLAG_POLL_ALWAYS)) || bbpad_taps_wanted()) &&
+        !(flags & (BB_FLAG_NOPAD | BB_FLAG_SCRIPT))) {
         /* the poll thread blocks inside SIO2MAN's session handshake, so it must not be the USB worker */
         th.attr = TH_C;
         th.thread = poll_thread;

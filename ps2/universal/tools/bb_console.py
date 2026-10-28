@@ -110,7 +110,7 @@ class Console:
             self.line('DualShock buttons (one player per controller, either half works):')
             self.table('Left half', 'Right half', SHARED)
             self.line('Multitap beta: tested in PCSX2 (Settings > Controllers > Global Settings > Multitap).')
-            self.line('On a PS3 only slot A works so far.')
+            self.line('PS3: slot B fix in testing (v1.2.0-beta.2).')
         elif layout != 0:
             self.line('DualShock buttons' + (' (port 2, players 3-4):' if layout == 1 else ':'))
             self.table('Left half', 'Right half', SHARED)

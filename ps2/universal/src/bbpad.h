@@ -13,6 +13,11 @@ int bbpad_state(void);
 void bbpad_poll_loop(unsigned flags);
 unsigned bbpad_poll_count(void);
 int bbpad_polling(void);
+/* layout-driven multitap use: call before the poll thread starts */
+void bbpad_configure(unsigned layout_id, unsigned flags);
+int bbpad_taps_wanted(void);
+unsigned bbpad_tap_cycles(void);
+unsigned bbpad_tap_mask(void);  /* bit 0 = tap found on port 1, bit 1 = port 2 */
 unsigned bbpad_hook_calls(void);
 unsigned bbpad_pad_events(void);
 

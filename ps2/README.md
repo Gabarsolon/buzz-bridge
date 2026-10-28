@@ -89,7 +89,17 @@ Menu choices are **1–9**. CLI layout IDs are **0–8**:
 | 8. Buzz! buzzers + 2 DualShocks, multitap port 2 (beta) | `7` / `buzzers_ds2_tap2` | PS3-mapped wired dongle: handsets 1–2 | Multitap: 2-A player 3, 2-B player 4 | 4 |
 | 9. 8 DualShocks, multitaps on both ports (beta) | `8` / `eight_ds_tap12` | Multitap: 1-A to 1-D = players 1–4 | Multitap: 2-A to 2-D = players 5–8 (second virtual buzzer set) | 8 |
 
-**Multitap setups (beta):** each DualShock on a multitap is one whole player (either half of the controller works, buttons as in the table below). In PCSX2, tick **Settings → Controllers → Global Settings → Multitap on Console Port 1/2** and set the slots (Controller Port 1A–1D / 2A–2D) to DualShock 2. Tested in PCSX2 with Buzz! The Schools Quiz (4 and 8 controllers). **On a PS3 only slot A works so far** (2-B never delivered input in the first test), so these setups give no extra players on a PS3 yet. Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of…), not Buzz! Junior or The Music Quiz (4 players). The module source in `universal/src/` is the 1.1.0 source; the multitap module source will be committed with the next build.
+**Multitap setups (beta):** each DualShock on a multitap is one whole player (either half of the controller works, buttons as in the table below). In PCSX2, tick **Settings → Controllers → Global Settings → Multitap on Console Port 1/2** and set the slots (Controller Port 1A–1D / 2A–2D) to DualShock 2. Tested in PCSX2 with Buzz! The Schools Quiz (4 and 8 controllers). Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of…), not Buzz! Junior or The Music Quiz (4 players).
+
+**Multitap on a PS3 (testing):** `ps2_netemu` has a built-in multitap. Put a `.CONFIG` file next to the ISO with the same name plus `.CONFIG` (for example `My Game.iso.CONFIG`) containing these 24 bytes to switch it on for port 2 (use `01` instead of `02` in both places for port 1):
+
+```text
+3D 00 00 00 57 44 00 00 1C 00 00 00 02 00 00 00 1D 00 00 00 02 00 00 00
+```
+
+Then assign each controller to its slot in the emulator's Controller Settings (PS button in game; each controller can only reassign itself). The first PS3 build only read slot A: netemu answers multitap commands in a different form than PCSX2. v1.2.0-beta.2 accepts both forms; it is not confirmed on a PS3 yet.
+
+**Multitap check (testing):** the patcher asks whether to turn it on for multitap setups (`--diag-tap` on the command line). In the game, hold **Select+Start** on the controller in the multitap's slot A: the last multitap player presses red and joins. Keep holding **Select** and watch that player for 4 seconds: it flashes **blue** = no multitap answer, **orange** = slot change refused, **yellow** = no controller data, **green** = working. Release Select to play normally. Use a copy without the check for normal play.
 
 **Shared DualShock:** the left half belongs to the first player on that port, the right half to the second. Shapes below refer to the buttons printed on the controller:
 

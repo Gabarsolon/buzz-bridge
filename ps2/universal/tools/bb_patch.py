@@ -26,6 +26,7 @@ SECTOR = 2048
 CFG_MAGIC = b'BBZCFG01'
 CFG_STRUCT = '<8sBBBBHH'
 FLAG_VERBOSE, FLAG_NOPAD, FLAG_SCRIPT = 0x01, 0x02, 0x04
+FLAG_DIAG_TAP = 0x08
 FLAG_POLL_AUTO, FLAG_POLL_ALWAYS = 0x10, 0x20
 EMBEDDED_LAYOUTS = [
     (0, 'buzzers', 'Buzz! buzzers only'),
@@ -220,6 +221,20 @@ def resolve_layout(value):
     raise PatchError('unknown layout: %s (use --list-layouts)' % value)
 
 
+DIAG_TAP_HELP = ('hold Select+Start on the multitap slot A controller to join the last multitap player, '
+                 'then keep holding Select: that player flashes blue = no multitap answer, orange = slot change '
+                 'refused, yellow = no controller data, green = working. Release Select to play normally.')
+
+
+def ask_diag_tap(console):
+    print('Turn on the multitap check (for testing on a PS3)? It shows on screen whether the multitap answers.')
+    try:
+        answer = input('Multitap check, y/N: ').strip().lower()
+    except EOFError:
+        return False
+    return answer in ('y', 'yes')
+
+
 def ask_layout(console=None):
     console = console or Console()
     console.section(2, 'Your setup')
@@ -231,7 +246,7 @@ def ask_layout(console=None):
                      'Buzz! buzzers + 2 DualShocks (multitap port 1)', '4 DualShocks (multitap port 1)',
                      'Buzz! buzzers + 2 DualShocks (multitap port 2)', '8 DualShocks (multitap ports 1+2)')
             if i == MULTITAP_LAYOUTS[0]:
-                print('  Multitap (beta: PCSX2 only for now, on a PS3 only slot A works):', flush=True)
+                print('  Multitap (beta: works in PCSX2, PS3 in testing):', flush=True)
             print('  %s  %-48s %d players' %
                   (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2, 4, 4, 4, 8)[i]), flush=True)
         else:
@@ -396,6 +411,14 @@ def cmd_patch(args):
         # The module reads multitap slots B-D itself; that needs its own pad poll.
         flags |= FLAG_POLL_AUTO
         args.poll = 'auto'
+    diag_tap = args.diag_tap
+    if layout in MULTITAP_LAYOUTS and args.layout is None and not diag_tap:
+        diag_tap = ask_diag_tap(console)
+    if diag_tap:
+        if layout not in MULTITAP_LAYOUTS or args.no_pad or args.script_demo:
+            raise PatchError('--diag-tap needs a multitap setup with pad input enabled')
+        flags |= FLAG_DIAG_TAP
+        print('Multitap check ON: ' + DIAG_TAP_HELP, flush=True)
     console.section(3, 'Patching')
     console.line('Patching the ISO now. Please keep this window open.')
     new = write_config(new, layout, flags, args.attach_delay_ms, args.heartbeat_ms)
@@ -535,6 +558,8 @@ def main(argv=None, console=None):
     dest.add_argument('--in-place', action='store_true', help='modify input instead of creating a copy')
     ap.add_argument('--layout', help='0-4 or name; omit to choose your setup interactively')
     ap.add_argument('--poll', choices=['off', 'auto', 'always'], default='auto', help='default auto; always is diagnostic')
+    ap.add_argument('--diag-tap', action='store_true',
+                    help='multitap setups: show the multitap state as colour flashes (hold Select on slot A)')
     ap.add_argument('--path', choices=SEARCH_PATHS, help='select if both USBD paths exist')
     ap.add_argument('--from-iso', help='with --restore: read original USBD from an unpatched ISO')
     ap.add_argument('--irx', help='alternate bbusbd.irx (developer option)')

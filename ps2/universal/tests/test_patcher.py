@@ -193,6 +193,18 @@ class PatcherTests(unittest.TestCase):
             lo = meta['usbd_lba'] * SECTOR
             self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + 20000])['flags'], flag)
 
+    def test_diag_tap_flag(self):
+        p, meta = self.iso(name='diag.iso')
+        lo = meta['usbd_lba'] * SECTOR
+        out = os.path.join(self.tmp, 'diag7.iso')
+        rc, so, se = run(p, '--out', out, '--irx', IRX, '--layout', 'buzzers_ds2_tap2', '--diag-tap')
+        self.assertEqual(rc, 0, se)
+        self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + 20000])['flags'], 0x19)
+        out = os.path.join(self.tmp, 'diag1.iso')
+        rc, so, se = run(p, '--out', out, '--irx', IRX, '--layout', 'buzzers_ds', '--diag-tap')
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(out))
+
     def test_junior_path(self):
         p, meta = self.iso(folder='SYSTEM', size=35009, name='j.iso')
         out = os.path.join(self.tmp, 'jout.iso')
@@ -310,6 +322,14 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(rd(self.p), self.original)
         cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
         self.assertEqual((cfg['layout'], cfg['flags']), (2, 0x11))
+
+    def test_interactive_multitap_asks_for_the_check(self):
+        rc, so, se = run(self.p, input_text=['8', 'y'])
+        self.assertEqual(rc, 0, se)
+        self.assertIn('Turn on the multitap check', so)
+        self.assertIn('Multitap check ON', so)
+        cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
+        self.assertEqual((cfg['layout'], cfg['flags']), (7, 0x19))
 
     def test_info_writes_nothing_and_reports_patched_config(self):
         before = sorted(os.listdir(self.tmp))

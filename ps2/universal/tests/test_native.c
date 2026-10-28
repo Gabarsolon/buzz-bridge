@@ -207,7 +207,7 @@ static void test_layouts(void)
     /* layout names line up with the X-macro list */
     CHECK(strcmp(bb_layout_name(0), "buzzers") == 0);
     CHECK(strcmp(bb_layout_name(4), "one_ds_shared") == 0);
-    CHECK(BB_LAYOUT_COUNT == 5);
+    CHECK(BB_LAYOUT_COUNT == 9);
 }
 
 static void test_script(void)
@@ -556,7 +556,7 @@ static void test_vusb_flow(void)
     CHECK(mb.light_done == 0); /* never completes inline */
     ticks(2);
     CHECK(mb.light_done == 1);
-    CHECK(memcmp(vusb_stats()->lights, "\x00\xFF\x00\xFF\x00\x00\x00", 7) == 0);
+    CHECK(memcmp(vusb_stats()->lights[0], "\x00\xFF\x00\xFF\x00\x00\x00", 7) == 0);
     CHECK(vusb_stats()->lights_updates == 1);
 
     /* unknown control request stalls, does not crash */
@@ -822,6 +822,333 @@ static void test_poll_fill(void)
     }
 }
 
+/* ---------------- multitap layouts, commands, slot tracking, two dongles ---------------- */
+
+static uint32_t mapd(unsigned layout, unsigned dongle, unsigned src, uint16_t m)
+{
+    bb_layout_t l;
+    uint16_t masks[BB_NSRC];
+    memset(masks, 0, sizeof masks);
+    masks[src] = m;
+    CHECK(bb_layout_build(layout, &l) == 0);
+    return bb_map_dongle(&l, masks, dongle);
+}
+
+#define SRC(port, slot) BB_SRC(port, slot)
+
+static void test_tap_layouts(void)
+{
+    bb_layout_t l;
+    uint8_t slots[BB_PORTS];
+
+    /* 5: dongle pad on 1A = handsets 1-2 (netemu mapping), DualShocks on 1B and 1C = handsets 3 and 4, whole pad each */
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 0), PADB_SQUARE) == W(0, BZ_RED));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 0), PADB_START) == W(1, BZ_BLUE));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 1), PADB_L1) == W(2, BZ_RED));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 1), PADB_R2) == W(2, BZ_RED));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 1), PADB_UP | PADB_TRIANGLE) == W(2, BZ_BLUE));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 2), PADB_CROSS) == W(3, BZ_YELLOW));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 2), PADB_LEFT) == W(3, BZ_ORANGE));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(0, 3), 0xFFFF) == 0); /* slot D unused */
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap1, 0, SRC(1, 0), 0xFFFF) == 0);
+    bb_layout_build(BB_LAYOUT_buzzers_ds2_tap1, &l);
+    CHECK(l.ndongles == 1);
+    CHECK(bb_layout_taps(&l, slots) == 1 && slots[0] == 0x06 && slots[1] == 0);
+
+    /* 6: four DualShocks one player each */
+    CHECK(mapd(BB_LAYOUT_four_ds_tap1, 0, SRC(0, 0), PADB_CIRCLE) == W(0, BZ_GREEN));
+    CHECK(mapd(BB_LAYOUT_four_ds_tap1, 0, SRC(0, 1), PADB_CIRCLE) == W(1, BZ_GREEN));
+    CHECK(mapd(BB_LAYOUT_four_ds_tap1, 0, SRC(0, 2), PADB_RIGHT) == W(2, BZ_GREEN));
+    CHECK(mapd(BB_LAYOUT_four_ds_tap1, 0, SRC(0, 3), PADB_TRIANGLE) == W(3, BZ_BLUE));
+    CHECK(mapd(BB_LAYOUT_four_ds_tap1, 0, SRC(1, 0), 0xFFFF) == 0);
+    bb_layout_build(BB_LAYOUT_four_ds_tap1, &l);
+    CHECK(bb_layout_taps(&l, slots) == 1 && slots[0] == 0x0E && slots[1] == 0);
+
+    /* 7: tap on port 2: buzzers on port 1, DualShocks on 2A and 2B */
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap2, 0, SRC(0, 0), PADB_L1) == W(0, BZ_BLUE));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap2, 0, SRC(1, 0), PADB_SQUARE) == W(2, BZ_ORANGE));
+    CHECK(mapd(BB_LAYOUT_buzzers_ds2_tap2, 0, SRC(1, 1), PADB_DOWN) == W(3, BZ_YELLOW));
+    bb_layout_build(BB_LAYOUT_buzzers_ds2_tap2, &l);
+    CHECK(bb_layout_taps(&l, slots) == 1 && slots[0] == 0 && slots[1] == 0x02);
+
+    /* 8: two virtual dongles, eight players */
+    bb_layout_build(BB_LAYOUT_eight_ds_tap12, &l);
+    CHECK(l.ndongles == 2);
+    CHECK(mapd(BB_LAYOUT_eight_ds_tap12, 0, SRC(0, 3), PADB_CROSS) == W(3, BZ_YELLOW));
+    CHECK(mapd(BB_LAYOUT_eight_ds_tap12, 1, SRC(1, 0), PADB_L1) == W(0, BZ_RED));
+    CHECK(mapd(BB_LAYOUT_eight_ds_tap12, 1, SRC(1, 2), PADB_SQUARE) == W(2, BZ_ORANGE));
+    CHECK(mapd(BB_LAYOUT_eight_ds_tap12, 1, SRC(0, 1), 0xFFFF) == 0); /* port 1 belongs to dongle 1 */
+    CHECK(mapd(BB_LAYOUT_eight_ds_tap12, 0, SRC(1, 1), 0xFFFF) == 0);
+    CHECK(bb_layout_taps(&l, slots) == 2 && slots[0] == 0x0E && slots[1] == 0x0E);
+    CHECK(bb_map_dongle(&l, (uint16_t[BB_NSRC]){0}, 2) == 0); /* only two dongles */
+
+    /* the old layouts are untouched: one dongle, no tap */
+    {
+        unsigned id;
+        for (id = 0; id <= 4; id++) {
+            bb_layout_build(id, &l);
+            CHECK(l.ndongles == 1 && bb_layout_taps(&l, slots) == 0);
+        }
+    }
+}
+
+static void test_tap_commands(void)
+{
+    bb_td_t td;
+    static const uint8_t ok_det[6] = {0xFF, 0x80, 0x5A, 0x04, 0x00, 0x5A};
+    static const uint8_t no_det[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    static const uint8_t sel2[7] = {0xFF, 0x80, 0x5A, 0x00, 0x00, 0x02, 0x5A};
+    static const uint8_t sel_bad[7] = {0xFF, 0x80, 0x5A, 0x00, 0x00, 0xFF, 0x66};
+
+    bb_td_reset(&td);
+    CHECK(bb_td_add_tap_detect(&td, 0) == 0 && bb_td_add_tap_detect(&td, 1) == 0);
+    CHECK(td.regdata[0] == 0x180642u && td.regdata[1] == 0x180643u && td.regdata[2] == 0);
+    CHECK(td.in_size == 12 && td.out_size == 12 && td.out_off[1] == 6);
+    {
+        static const uint8_t exp[12] = {0x21, 0x12, 0, 0, 0, 0, 0x21, 0x12, 0, 0, 0, 0};
+        CHECK(memcmp(td.in, exp, 12) == 0);
+    }
+    CHECK(td.ctrl1[2] == 0xFF020505u && td.ctrl2[2] == 0x00030064u && td.ctrl1[3] == 0xFF020505u && td.ctrl1[0] == 0);
+
+    bb_td_reset(&td);
+    CHECK(bb_td_add_tap_select(&td, 0, 2) == 0 && bb_td_add_tap_select(&td, 1, 3) == 0);
+    CHECK(td.regdata[0] == 0x1C0742u && td.regdata[1] == 0x1C0743u);
+    {
+        static const uint8_t exp[14] = {0x21, 0x21, 2, 0, 0, 0, 0, 0x21, 0x21, 3, 0, 0, 0, 0};
+        CHECK(td.in_size == 14 && memcmp(td.in, exp, 14) == 0);
+    }
+    CHECK(bb_td_add_tap_select(&td, 0, 4) == -1 && bb_td_add_tap_select(&td, 2, 1) == -1);
+
+    bb_td_reset(&td);
+    CHECK(bb_td_add_pad_read(&td, 0) == 0 && bb_td_add_pad_read(&td, 1) == 0);
+    CHECK(td.regdata[0] == 0x140540u && td.regdata[1] == 0x140541u && td.ctrl1[0] == 0xFFC00505u && td.ctrl1[2] == 0);
+
+    /* full: 8 entries / 64 bytes are the limit */
+    bb_td_reset(&td);
+    {
+        int i, last = 0;
+        for (i = 0; i < 12; i++)
+            last = bb_td_add_tap_select(&td, 0, 1);
+        CHECK(td.n == 8 && last == -1);
+    }
+
+    CHECK(bb_tap_detect_reply(ok_det, 6) == 4);
+    CHECK(bb_tap_detect_reply(no_det, 6) == 0);
+    CHECK(bb_tap_detect_reply(ok_det, 5) == 0);
+    {
+        uint8_t o[6];
+        memcpy(o, ok_det, 6);
+        o[3] = 0;
+        CHECK(bb_tap_detect_reply(o, 6) == 0);
+        o[3] = 5;
+        CHECK(bb_tap_detect_reply(o, 6) == 0);
+        o[3] = 1;
+        CHECK(bb_tap_detect_reply(o, 6) == 1);
+        o[5] = 0x66; /* freemtap treats byte 5 == 0x66 as "no tap" */
+        CHECK(bb_tap_detect_reply(o, 6) == 0);
+    }
+    CHECK(bb_tap_select_reply_ok(sel2, 7, 2) == 1);
+    CHECK(bb_tap_select_reply_ok(sel2, 7, 1) == 0);
+    CHECK(bb_tap_select_reply_ok(sel_bad, 7, 0xFF) == 0);
+    CHECK(bb_tap_select_reply_ok(sel2, 6, 2) == 0);
+    /* Exact native netemu replies: FIFO starts FF, terminator starts FF.
+     * Sony's 21 41 5A setup changes the terminator but adds no header. */
+    {
+        uint8_t det[] = {0xFF, 0xFF, 0, 4, 0, 0xFF};
+        uint8_t sel[] = {0xFF, 0xFF, 0xFF, 0xFF, 0, 3, 0xFF};
+        CHECK(bb_tap_detect_reply(det, sizeof det) == 4);
+        CHECK(bb_tap_select_reply_ok(sel, sizeof sel, 3));
+        CHECK(!bb_tap_select_reply_ok(sel, sizeof sel, 2));
+        det[5] = sel[6] = 0x5A;
+        CHECK(bb_tap_detect_reply(det, sizeof det) == 4);
+        CHECK(bb_tap_select_reply_ok(sel, sizeof sel, 3));
+        det[5] = sel[6] = 0x66;
+        CHECK(!bb_tap_detect_reply(det, sizeof det));
+        CHECK(!bb_tap_select_reply_ok(sel, sizeof sel, 3));
+        CHECK(!bb_tap_detect_reply(NULL, 6));
+        CHECK(!bb_tap_select_reply_ok(NULL, 7, 0));
+        memset(sel, 0xFF, sizeof sel);
+        CHECK(!bb_tap_select_reply_ok(sel, sizeof sel, 0));
+        CHECK(!bb_tap_select_reply_ok(sel, sizeof sel, 0xFF));
+    }
+}
+
+static void test_scan_slots(void)
+{
+    uint32_t reg[16];
+    uint8_t in[64], out[64];
+    uint32_t is = 0, os = 0;
+    bb_padev_t ev[BB_MAX_PADEV];
+    uint8_t cur[BB_PORTS] = {0, 0};
+    int n;
+
+    /* transfer 1: select slot 2 on tap 1 (answered), transfer 2 in the same descriptor: pad read port 1 */
+    memset(reg, 0, sizeof reg);
+    reg[0] = 0x1C0742u;
+    memcpy(in + is, "\x21\x21\x02\x00\x00\x00\x00", 7);
+    memcpy(out + os, "\xFF\x80\x5A\x00\x00\x02\x5A", 7);
+    is += 7;
+    os += 7;
+    reg[1] = 0x140540u;
+    memcpy(in + is, "\x01\x42\x00\x00\x00", 5);
+    memcpy(out + os, "\xFF\x41\x5A\xFE\xFF", 5);
+    is += 5;
+    os += 5;
+    n = bb_sio2_scan_ex(reg, in, is, out, os, ev, cur);
+    CHECK(n == 1 && ev[0].port == 0 && ev[0].slot == 2 && ev[0].buttons == PADB_SELECT && cur[0] == 2 && cur[1] == 0);
+
+    /* a refused select keeps the old slot */
+    memset(reg, 0, sizeof reg);
+    reg[0] = 0x1C0742u;
+    memcpy(out, "\xFF\x80\x5A\x00\x00\xFF\x66", 7);
+    memcpy(in, "\x21\x21\x03\x00\x00\x00\x00", 7);
+    n = bb_sio2_scan_ex(reg, in, 7, out, 7, ev, cur);
+    CHECK(n == 0 && cur[0] == 2);
+
+    /* back to A on tap 2 only: port 1 of the console is not touched */
+    memset(reg, 0, sizeof reg);
+    reg[0] = 0x1C0743u;
+    memcpy(in, "\x21\x21\x00\x00\x00\x00\x00", 7);
+    memcpy(out, "\xFF\x80\x5A\x00\x00\x00\x5A", 7);
+    cur[1] = 1;
+    n = bb_sio2_scan_ex(reg, in, 7, out, 7, ev, cur);
+    CHECK(n == 0 && cur[0] == 2 && cur[1] == 0);
+
+    /* without the tracking array the same data only yields slot 0 and no crash */
+    memset(reg, 0, sizeof reg);
+    reg[0] = 0x140540u;
+    memcpy(in, "\x01\x42\x00\x00\x00", 5);
+    memcpy(out, "\xFF\x41\x5A\xFF\xFF", 5);
+    n = bb_sio2_scan(reg, in, 5, out, 5, ev);
+    CHECK(n == 1 && ev[0].slot == 0);
+    /* a tap command whose descriptor is too short is skipped */
+    memset(reg, 0, sizeof reg);
+    reg[0] = (2u << 18) | (2u << 8) | 0x42;
+    n = bb_sio2_scan_ex(reg, in, 2, out, 2, ev, cur);
+    CHECK(n == 0);
+}
+
+/* ---- two dongles with a mock BUZZER that counts devices ---- */
+
+static struct {
+    int connected[3];
+    int ep0[3], epin[3];
+    uint8_t buf[3][16];
+    uint8_t last[3][5];
+    int nrep[3];
+    int cfg[3];
+    uint8_t light[3][7];
+} m2;
+
+static void m2_read_done(int result, int count, void *arg)
+{
+    int d = (int)(intptr_t)arg;
+    if (result == 0 && count == 5) {
+        memcpy(m2.last[d], m2.buf[d], 5);
+        m2.nrep[d]++;
+        vusb_transfer(m2.epin[d], m2.buf[d], 16, NULL, m2_read_done, arg, &fake_gp_a);
+    }
+}
+
+static void m2_cfg_done(int result, int count, void *arg)
+{
+    int d = (int)(intptr_t)arg;
+    (void)count;
+    if (result == 0) {
+        m2.cfg[d] = 1;
+        vusb_transfer(m2.epin[d], m2.buf[d], 16, NULL, m2_read_done, arg, &fake_gp_a);
+    }
+}
+
+static int m2_probe(int devId)
+{
+    const uint8_t *d = vusb_scan_descriptor(devId, NULL, 1);
+    return d && d[8] == 0x4C && d[9] == 0x05 && d[10] == 2;
+}
+
+static vu_setup_t m2_setup[3];
+
+static int m2_connect(int devId)
+{
+    vu_epdesc_t epd = {7, 5, 0x81, 3, 8, 0, 10};
+    uint8_t loc[7];
+    CHECK(devId == 1 || devId == 2);
+    m2.connected[devId]++;
+    m2.ep0[devId] = vusb_open_pipe(devId, NULL);
+    m2.epin[devId] = vusb_open_pipe(devId, &epd);
+    CHECK(m2.ep0[devId] > 0 && m2.epin[devId] > 0);
+    CHECK(vusb_get_location(devId, loc) == 0 && loc[0] == devId);
+    CHECK(vusb_set_private(devId, &m2) == 0);
+    m2_setup[devId].requesttype = 0;
+    m2_setup[devId].request = 9;
+    m2_setup[devId].value = 1;
+    CHECK(vusb_transfer(m2.ep0[devId], NULL, 0, &m2_setup[devId], m2_cfg_done, (void *)(intptr_t)devId, &fake_gp_a) == 0);
+    return 0;
+}
+
+static void test_two_dongles(void)
+{
+    static vu_ldd_t l;
+    static char nm[] = "buzzer";
+    vu_setup_t su = {0x21, 9, 0x0200, 0, 7};
+
+    memset(&m2, 0, sizeof m2);
+    mb_reset();
+    memset(mock_masks, 0, sizeof mock_masks);
+    vusb_init(0, 100, BB_LAYOUT_eight_ds_tap12, 0);
+    CHECK(vusb_dongles() == 2);
+    memset(&l, 0, sizeof l);
+    l.name = nm;
+    l.probe = m2_probe;
+    l.connect = m2_connect;
+    CHECK(vusb_register_ldd(&l, &fake_gp_a) == 0);
+    ticks(10);
+    CHECK(m2.connected[1] == 1 && m2.connected[2] == 1);
+    CHECK(m2.cfg[1] && m2.cfg[2] && m2.ep0[1] != m2.ep0[2] && m2.epin[1] != m2.epin[2]);
+    CHECK(vusb_get_private(1) == &m2 && vusb_get_private(2) == &m2);
+    CHECK(vusb_scan_descriptor(3, NULL, 1) == NULL);
+    CHECK(m2.nrep[1] >= 1 && m2.nrep[2] >= 1);
+    CHECK(memcmp(m2.last[1], "\x7F\x7F\x00\x00\xF0", 5) == 0 && memcmp(m2.last[2], "\x7F\x7F\x00\x00\xF0", 5) == 0);
+
+    mock_masks[SRC(0, 1)] = PADB_CROSS;  /* dongle 1, handset 2 yellow = bit 6 */
+    mock_masks[SRC(1, 2)] = PADB_SQUARE; /* dongle 2, handset 3 orange = bit 13 */
+    ticks(4);
+    CHECK(memcmp(m2.last[1], "\x7F\x7F\x40\x00\xF0", 5) == 0);
+    CHECK(memcmp(m2.last[2], "\x7F\x7F\x00\x20\xF0", 5) == 0);
+    mock_masks[SRC(0, 1)] = 0;
+    ticks(4);
+    CHECK(memcmp(m2.last[1], "\x7F\x7F\x00\x00\xF0", 5) == 0);
+    CHECK(memcmp(m2.last[2], "\x7F\x7F\x00\x20\xF0", 5) == 0); /* untouched */
+
+    /* lights of dongle 2 do not overwrite dongle 1 */
+    memcpy(m2.light[2], "\x00\xFF\x00\x00\xFF\x00\x00", 7);
+    CHECK(vusb_transfer(m2.ep0[2], m2.light[2], 7, &su, m2_cfg_done, (void *)(intptr_t)0, &fake_gp_a) == 0);
+    ticks(2);
+    CHECK(memcmp(vusb_stats()->lights[1], "\x00\xFF\x00\x00\xFF\x00\x00", 7) == 0);
+    CHECK(memcmp(vusb_stats()->lights[0], "\x00\x00\x00\x00\x00\x00\x00", 7) == 0);
+
+    /* a control pipe of the missing dongle number does not exist, closing a pipe aborts only its own read */
+    CHECK(vusb_close_pipe(m2.epin[1]) == 0);
+    ticks(2);
+    mock_masks[SRC(1, 3)] = PADB_UP;
+    ticks(4);
+    CHECK(m2.nrep[2] > 2);
+    CHECK(vusb_transfer(3, NULL, 0, &su, NULL, NULL, &fake_gp_a) == VU_RC_BADPIPE);
+
+    /* one-dongle layouts never attach a second device */
+    mb_reset();
+    memset(&m2, 0, sizeof m2);
+    vusb_init(0, 100, BB_LAYOUT_four_ds_tap1, 0);
+    memset(&l, 0, sizeof l);
+    l.name = nm;
+    l.probe = m2_probe;
+    l.connect = m2_connect;
+    CHECK(vusb_dongles() == 1 && vusb_register_ldd(&l, &fake_gp_a) == 0);
+    ticks(10);
+    CHECK(m2.connected[1] == 1 && m2.connected[2] == 0);
+    CHECK(vusb_scan_descriptor(2, NULL, 1) == NULL);
+}
+
 int main(void)
 {
     test_descriptors();
@@ -836,6 +1163,10 @@ int main(void)
     test_vusb_script();
     test_report_overrun_and_small_buffer();
     test_fuzz();
+    test_tap_layouts();
+    test_tap_commands();
+    test_scan_slots();
+    test_two_dongles();
     printf("%d checks, %d failures\n", checks, failures);
     return failures ? 1 : 0;
 }
