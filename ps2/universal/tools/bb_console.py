@@ -122,7 +122,7 @@ class Console:
         if layout >= 5:
             self.line('DualShock buttons (one player per controller, either half works):')
             self.table('Left half', 'Right half', SHARED)
-            self.line('PCSX2: Settings > Controllers > Global Settings > Multitap on Console Port 1/2.')
+            self.line('PCSX2: tick its built-in multitap setting (Settings > Controllers > Global Settings > Multitap on Console Port 1/2); no physical multitap needed.')
             if layout < 9:
                 self.line('PS3: CONFIG needed unless controllers happen to land on the required fixed slots.')
         elif layout != 0:

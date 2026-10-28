@@ -236,10 +236,10 @@ MENU = (
     (2, '2 DualShocks, shared', 4),
     (3, '2 DualShocks, one player each', 2),
     (4, '1 DualShock, shared', 2),
-    (9, 'Buzz! buzzers + 2 DualShocks (multitap, any slots)', 4),
-    (10, '4 DualShocks (multitap, any slots)', 4),
-    (11, '2 pairs of Buzz! buzzers + 4 DualShocks (multitap, any slots)', 8),
-    (12, '8 DualShocks (multitap, any slots)', 8),
+    (9, 'Buzz! buzzers + 2 DualShocks (any slots)', 4),
+    (10, '4 DualShocks (any slots)', 4),
+    (11, '2 pairs of Buzz! buzzers + 4 DualShocks (any slots)', 8),
+    (12, '8 DualShocks (any slots)', 8),
 )
 
 
@@ -250,7 +250,7 @@ def ask_layout(console=None):
     width = max(len(name) for _, name, _ in MENU)
     for n, (layout_id, name, players) in enumerate(MENU, 1):
         if layout_id == 9:
-            print('  Multitap: controllers can sit on any slot.', flush=True)
+            print("  More than 2 controllers: no extra hardware needed, the patch uses the emulator's built-in multitap.", flush=True)
         label = '%d)' % n
         if console.enabled:
             label = console.paint(label, '1;96')
