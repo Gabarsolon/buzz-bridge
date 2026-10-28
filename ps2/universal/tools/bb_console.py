@@ -97,12 +97,21 @@ class Console:
             'Port 1: players 1-2 split. Port 2: players 3-4 split.',
             'Port 1: player 1. Port 2: player 2. Either half works.',
             'Port 1: players 1-2 split. Port 2: unused.',
+            'Multitap on port 1: buzzers in slot 1-A (handsets 1-2), DualShocks in 1-B and 1-C (players 3-4).',
+            'Multitap on port 1: DualShocks in slots 1-A to 1-D (players 1-4).',
+            'Port 1: buzzers (handsets 1-2). Multitap on port 2: DualShocks in 2-A and 2-B (players 3-4).',
+            'Multitaps on ports 1 and 2: DualShocks in 1-A to 1-D (players 1-4) and 2-A to 2-D (players 5-8).',
         )
         self.line('\nSelected: ' + descriptions[layout])
-        if layout in (0, 1):
+        if layout in (0, 1, 5, 7):
             self.line('PS3 wired buzzers (port 1):')
             self.table('Handset 1', 'Handset 2', BUZZERS)
-        if layout != 0:
+        if layout >= 5:
+            self.line('DualShock buttons (one player per controller, either half works):')
+            self.table('Left half', 'Right half', SHARED)
+            self.line('Multitap beta: tested in PCSX2 (Settings > Controllers > Global Settings > Multitap).')
+            self.line('On a PS3 only slot A works so far.')
+        elif layout != 0:
             self.line('DualShock buttons' + (' (port 2, players 3-4):' if layout == 1 else ':'))
             self.table('Left half', 'Right half', SHARED)
 

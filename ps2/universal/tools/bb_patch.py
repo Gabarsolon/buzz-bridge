@@ -33,7 +33,12 @@ EMBEDDED_LAYOUTS = [
     (2, 'two_ds_shared', '2 DualShocks, 2 players each (4 players)'),
     (3, 'two_ds_single', '2 DualShocks, 1 player each'),
     (4, 'one_ds_shared', '1 DualShock, 2 players'),
+    (5, 'buzzers_ds2_tap1', 'Buzz! buzzers + 2 DualShocks on a multitap in port 1 (4 players)'),
+    (6, 'four_ds_tap1', '4 DualShocks on a multitap in port 1 (4 players)'),
+    (7, 'buzzers_ds2_tap2', 'Buzz! buzzers + 2 DualShocks on a multitap in port 2 (4 players)'),
+    (8, 'eight_ds_tap12', '8 DualShocks on two multitaps (8 players, quiz games)'),
 ]
+MULTITAP_LAYOUTS = (5, 6, 7, 8)
 KNOWN_USBD = {
     'cbae284db35baceeaaed642351df99817ec47586': 'Sony USBD 1.3.0 (Schools/Mega family)',
     '80ebc1a552dffaf5640714b69bac4cbc173e3d22': 'Sony USBD 1.4.0 (Junior family)',
@@ -222,19 +227,23 @@ def ask_layout(console=None):
     for i, _, desc in EMBEDDED_LAYOUTS:
         if console.enabled:
             names = ('Buzz! buzzers only', 'Buzz! buzzers + 1 DualShock',
-                     '2 DualShocks, shared', '2 DualShocks, one player each', '1 DualShock, shared')
-            print('  %s  %-32s %d players' %
-                  (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2)[i]), flush=True)
+                     '2 DualShocks, shared', '2 DualShocks, one player each', '1 DualShock, shared',
+                     'Buzz! buzzers + 2 DualShocks (multitap port 1)', '4 DualShocks (multitap port 1)',
+                     'Buzz! buzzers + 2 DualShocks (multitap port 2)', '8 DualShocks (multitap ports 1+2)')
+            if i == MULTITAP_LAYOUTS[0]:
+                print('  Multitap (beta: PCSX2 only for now, on a PS3 only slot A works):', flush=True)
+            print('  %s  %-48s %d players' %
+                  (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2, 4, 4, 4, 8)[i]), flush=True)
         else:
             print('%d) %s' % (i + 1, desc))
     while True:
         try:
-            answer = input('Choose 1-5: ').strip()
+            answer = input('Choose 1-%d: ' % len(EMBEDDED_LAYOUTS)).strip()
         except EOFError:
             raise PatchError('no setup selected; use --layout for non-interactive use') from None
-        if answer in ('1', '2', '3', '4', '5'):
+        if answer.isdigit() and 1 <= int(answer) <= len(EMBEDDED_LAYOUTS):
             return int(answer) - 1
-        print('Please enter a number from 1 to 5.')
+        print('Please enter a number from 1 to %d.' % len(EMBEDDED_LAYOUTS))
 
 
 def same_file(a, b):
@@ -383,6 +392,10 @@ def cmd_patch(args):
     else:
         layout = ask_layout(console)
     console.setup(layout)
+    if layout in MULTITAP_LAYOUTS and args.poll == 'off':
+        # The module reads multitap slots B-D itself; that needs its own pad poll.
+        flags |= FLAG_POLL_AUTO
+        args.poll = 'auto'
     console.section(3, 'Patching')
     console.line('Patching the ISO now. Please keep this window open.')
     new = write_config(new, layout, flags, args.attach_delay_ms, args.heartbeat_ms)

@@ -75,7 +75,7 @@ Restoration refuses wrong checksums, changed extents and unrelated USBD edits. R
 
 ## Setups and controller buttons
 
-Menu choices are **1–5**. CLI layout IDs are **0–4**:
+Menu choices are **1–9**. CLI layout IDs are **0–8**:
 
 | Menu | CLI ID / name | Controller port 1 | Controller port 2 | Players |
 |---|---|---|---|---|
@@ -84,6 +84,12 @@ Menu choices are **1–5**. CLI layout IDs are **0–4**:
 | 3. 2 DualShocks, 2 players each (4 players) | `2` / `two_ds_shared` | Split: players 1–2 | Split: players 3–4 | 4 |
 | 4. 2 DualShocks, 1 player each | `3` / `two_ds_single` | Whole controller: player 1 | Whole controller: player 2 | 2 |
 | 5. 1 DualShock, 2 players | `4` / `one_ds_shared` | Split: players 1–2 | Unused | 2 |
+| 6. Buzz! buzzers + 2 DualShocks, multitap port 1 (beta) | `5` / `buzzers_ds2_tap1` | Multitap: 1-A buzzers (handsets 1–2), 1-B player 3, 1-C player 4 | Unused | 4 |
+| 7. 4 DualShocks, multitap port 1 (beta) | `6` / `four_ds_tap1` | Multitap: 1-A to 1-D = players 1–4 | Unused | 4 |
+| 8. Buzz! buzzers + 2 DualShocks, multitap port 2 (beta) | `7` / `buzzers_ds2_tap2` | PS3-mapped wired dongle: handsets 1–2 | Multitap: 2-A player 3, 2-B player 4 | 4 |
+| 9. 8 DualShocks, multitaps on both ports (beta) | `8` / `eight_ds_tap12` | Multitap: 1-A to 1-D = players 1–4 | Multitap: 2-A to 2-D = players 5–8 (second virtual buzzer set) | 8 |
+
+**Multitap setups (beta):** each DualShock on a multitap is one whole player (either half of the controller works, buttons as in the table below). In PCSX2, tick **Settings → Controllers → Global Settings → Multitap on Console Port 1/2** and set the slots (Controller Port 1A–1D / 2A–2D) to DualShock 2. Tested in PCSX2 with Buzz! The Schools Quiz (4 and 8 controllers). **On a PS3 only slot A works so far** (2-B never delivered input in the first test), so these setups give no extra players on a PS3 yet. Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of…), not Buzz! Junior or The Music Quiz (4 players). The module source in `universal/src/` is the 1.1.0 source; the multitap module source will be committed with the next build.
 
 **Shared DualShock:** the left half belongs to the first player on that port, the right half to the second. Shapes below refer to the buttons printed on the controller:
 
