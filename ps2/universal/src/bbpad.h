@@ -7,7 +7,7 @@
 /* Returns 1 hooked, 0 SIO2MAN not loaded yet (try again later), -1 unsupported (never retry). */
 int bbpad_install(void);
 void bbpad_tick(void);                        /* every worker tick: ages the snapshots */
-void bbpad_sample(uint16_t masks[BB_NSRC]);   /* writes the current buttons of ports that answered recently */
+unsigned bbpad_sample(uint16_t masks[BB_NSRC]); /* buttons + valid sources from the last complete scan */
 int bbpad_state(void);
 /* own polling (BB_FLAG_POLL_*). bbpad_poll_loop is the body of a separate thread. */
 void bbpad_poll_loop(unsigned flags);

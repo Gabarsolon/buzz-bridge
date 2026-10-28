@@ -37,6 +37,8 @@ static struct {
     uint32_t tick, attach_at, hb_ticks, attach_ticks;
     unsigned flags;
     bb_layout_t layout;
+    bb_assign_t assignment;
+    unsigned layout_id;
     vu_ldd_t *head, *tail;
     dev_t_ dev[VU_MAXDEV];
     int pipe_gen;
@@ -79,6 +81,8 @@ void vusb_init(unsigned attach_delay_ms, unsigned heartbeat_ms, unsigned layout,
 
     mem_zero(&vu, sizeof vu);
     vu.flags = flags;
+    vu.layout_id = layout;
+    bb_assign_init(&vu.assignment);
     vu.attach_ticks = attach_delay_ms / VU_TICK_MS;
     vu.hb_ticks = heartbeat_ms / VU_TICK_MS;
     if (vu.hb_ticks == 0)
@@ -609,7 +613,8 @@ static void deliver_input(void)
         for (d = 1; d < VU_MAXDEV; d++)
             word[d] = 0;
     } else {
-        vos_sample(masks);
+        unsigned present = vos_sample(masks);
+        bb_assign_update(&vu.assignment, &vu.layout, vu.layout_id, present, vu.tick * VU_TICK_MS);
         for (d = 0; d < VU_MAXDEV; d++)
             word[d] = bb_map_dongle(&vu.layout, masks, (unsigned)d);
     }

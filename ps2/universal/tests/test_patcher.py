@@ -151,6 +151,20 @@ class PatcherTests(unittest.TestCase):
         self.assertEqual(parsed, [(i, n) for i, n, _ in bb_patch.EMBEDDED_LAYOUTS])
         self.assertEqual([(i, n) for i, n, _ in bb_patch.load_layouts()], parsed)
 
+    def test_any_slot_layouts(self):
+        p, meta = self.iso(name='any.iso')
+        for layout, name in ((9, 'any_buzzers_ds'), (10, 'any_ds4'), (11, 'any_2buzzers_ds'), (12, 'any_ds8')):
+            out = os.path.join(self.tmp, 'any_%d.iso' % layout)
+            rc, so, se = run(p, '--out', out, '--layout', name, '--irx', IRX, '--poll', 'off')
+            self.assertEqual(rc, 0, so + se)
+            cfg = bb_patch.read_config(rd(out)[meta['usbd_lba'] * SECTOR:])
+            self.assertEqual((cfg['layout'], cfg['flags']), (layout, 0x11))
+            refused = os.path.join(self.tmp, 'diag_any_%d.iso' % layout)
+            rc, so, se = run(p, '--out', refused, '--layout', name, '--irx', IRX, '--diag-tap')
+            self.assertEqual(rc, 1)
+            self.assertIn('--diag-tap is not supported for any-slot', se)
+            self.assertFalse(os.path.exists(refused))
+
     def test_info(self):
         p, meta = self.iso()
         rc, out, err = run('--info', p)
@@ -330,6 +344,13 @@ class SafetyTests(unittest.TestCase):
         self.assertIn('Multitap check ON', so)
         cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
         self.assertEqual((cfg['layout'], cfg['flags']), (7, 0x19))
+
+    def test_interactive_any_slot_does_not_ask_for_the_check(self):
+        rc, so, se = run(self.p, input_text=['10'])
+        self.assertEqual(rc, 0, se)
+        self.assertNotIn('Turn on the multitap check', so)
+        cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
+        self.assertEqual((cfg['layout'], cfg['flags']), (9, 0x11))
 
     def test_info_writes_nothing_and_reports_patched_config(self):
         before = sorted(os.listdir(self.tmp))

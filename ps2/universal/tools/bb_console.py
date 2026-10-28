@@ -101,16 +101,30 @@ class Console:
             'Multitap on port 1: DualShocks in slots 1-A to 1-D (players 1-4).',
             'Port 1: buzzers (handsets 1-2). Multitap on port 2: DualShocks in 2-A and 2-B (players 3-4).',
             'Multitaps on ports 1 and 2: DualShocks in 1-A to 1-D (players 1-4) and 2-A to 2-D (players 5-8).',
+            'Any slots: lowest occupied slot is the buzzer pad (handsets 1-2); up to two DualShocks get handsets 3-4.',
+            'Any slots on both ports: up to four DualShocks, one handset each.',
+            'Any slots: lowest two occupied slots are buzzer pads (handsets 1-2 and 5-6); up to four DualShocks get 3,4,7,8.',
+            'Any slots on both ports: up to eight DualShocks, two virtual dongles.',
         )
         self.line('\nSelected: ' + descriptions[layout])
         if layout in (0, 1, 5, 7):
             self.line('PS3 wired buzzers (port 1):')
             self.table('Handset 1', 'Handset 2', BUZZERS)
+        if layout in (9, 11):
+            self.line('PS3 wired buzzers (lowest occupied slot' + ('s' if layout == 11 else '') + '):')
+            self.table('Handset 1', 'Handset 2', BUZZERS)
+            if layout == 11:
+                self.line('Second buzzer pad: same buttons for handsets 5 and 6.')
+        if layout >= 9:
+            self.line('No PS3 CONFIG needed. Connect buzzers before launch in the lowest occupied slot(s).')
+            self.line('Handsets stay assigned; a missing pad releases its handset after about 3 seconds.')
+            self.line('Select, Start, L3 and R3 also buzz red on a DualShock.')
         if layout >= 5:
             self.line('DualShock buttons (one player per controller, either half works):')
             self.table('Left half', 'Right half', SHARED)
-            self.line('Multitap beta: tested in PCSX2 (Settings > Controllers > Global Settings > Multitap).')
-            self.line('PS3: slot B fix in testing (v1.2.0-beta.2).')
+            self.line('PCSX2: Settings > Controllers > Global Settings > Multitap. Any-slot setups await live testing.')
+            if layout < 9:
+                self.line('PS3: CONFIG needed unless controllers happen to land on the required fixed slots.')
         elif layout != 0:
             self.line('DualShock buttons' + (' (port 2, players 3-4):' if layout == 1 else ':'))
             self.table('Left half', 'Right half', SHARED)

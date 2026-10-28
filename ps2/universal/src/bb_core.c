@@ -65,6 +65,7 @@ int bb_layout_build(unsigned id, bb_layout_t *out)
     const unsigned P1 = BB_SRC(0, 0), P2 = BB_SRC(1, 0);
 
     out->ndongles = 1;
+    out->any_slots = 0;
     for (h = 0; h < BB_ALL_HANDSETS; h++) {
         out->h[h].src = BB_NOSRC;
         for (i = 0; i < BZ_COUNT; i++)
@@ -119,8 +120,77 @@ int bb_layout_build(unsigned id, bb_layout_t *out)
             bind(&out->h[4 + h], BB_SRC(1, h), half_left, half_right);
         }
         return 0;
+    case BB_LAYOUT_any_buzzers_ds:
+    case BB_LAYOUT_any_ds4:
+    case BB_LAYOUT_any_2buzzers_ds:
+    case BB_LAYOUT_any_ds8:
+        out->any_slots = 1;
+        out->ndongles = id >= BB_LAYOUT_any_2buzzers_ds ? 2 : 1;
+        return 0;
     default:
         return -1;
+    }
+}
+
+void bb_assign_init(bb_assign_t *a)
+{
+    unsigned s;
+    for (s = 0; s < BB_NSRC; s++) {
+        a->owner[s] = BB_NOSRC;
+        a->seen[s] = 0;
+    }
+}
+
+void bb_assign_update(bb_assign_t *a, bb_layout_t *lay, unsigned id,
+                      unsigned present, uint32_t ms)
+{
+    unsigned s, h, used = 0;
+    unsigned nbuzz = id == BB_LAYOUT_any_buzzers_ds ? 1 :
+                     id == BB_LAYOUT_any_2buzzers_ds ? 2 : 0;
+    if (!lay->any_slots)
+        return;
+    /* Expire only the missing owner. Never compact surviving assignments. */
+    for (s = 0; s < BB_NSRC; s++) {
+        if (present & (1u << s))
+            a->seen[s] = ms;
+        else if ((uint32_t)(ms - a->seen[s]) >= BB_ASSIGN_TIMEOUT_MS)
+            a->owner[s] = BB_NOSRC;
+        if (a->owner[s] != BB_NOSRC)
+            used |= 1u << a->owner[s];
+    }
+    for (s = 0; s < BB_NSRC; s++) {
+        if (!(present & (1u << s)) || a->owner[s] != BB_NOSRC)
+            continue;
+        /* Buzzer pads take handsets 1-2 / 5-6; DualShocks take the rest. */
+        for (h = 0; h < nbuzz; h++)
+            if (!(used & (1u << (h * 4))))
+                break;
+        if (h < nbuzz) {
+            h *= 4;
+        } else {
+            for (h = 0; h < lay->ndongles * BB_HANDSETS; h++)
+                if (!(nbuzz && (h < 2 || (nbuzz == 2 && h >= 4 && h < 6))) &&
+                    !(used & (1u << h)))
+                    break;
+            if (h == lay->ndongles * BB_HANDSETS)
+                continue; /* extra pads do not take ownership */
+        }
+        a->owner[s] = (uint8_t)h;
+        used |= 1u << h;
+    }
+    for (h = 0; h < BB_ALL_HANDSETS; h++)
+        lay->h[h].src = BB_NOSRC;
+    for (s = 0; s < BB_NSRC; s++) {
+        h = a->owner[s];
+        if (h == BB_NOSRC)
+            continue;
+        if (nbuzz && (h == 0 || (nbuzz == 2 && h == 4))) {
+            bind(&lay->h[h], s, netemu_h1, 0);
+            bind(&lay->h[h + 1], s, netemu_h2, 0);
+        } else {
+            bind(&lay->h[h], s, half_left, half_right);
+            lay->h[h].mask[BZ_RED] |= PADB_SELECT | PADB_START | PADB_L3 | PADB_R3;
+        }
     }
 }
 
@@ -149,7 +219,7 @@ unsigned bb_layout_taps(const bb_layout_t *lay, uint8_t slots[BB_PORTS])
     unsigned h, p, n = 0;
 
     for (p = 0; p < BB_PORTS; p++)
-        slots[p] = 0;
+        slots[p] = lay->any_slots ? 0x0E : 0;
     for (h = 0; h < BB_ALL_HANDSETS; h++) {
         unsigned src = lay->h[h].src;
         if (src < BB_NSRC && (src % BB_SLOTS) != 0)

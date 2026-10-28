@@ -52,6 +52,8 @@ static u8 tap_slots[BB_PORTS]; /* slot count a detected tap reported, 0 = none f
 static volatile u8 tap_stage[BB_NSRC]; /* 0 no detect, 1 select refused, 2 empty/error, 3 valid read */
 static u8 diag_slot[BB_PORTS];
 static unsigned diag_tap;
+static unsigned any_slots;
+static volatile u32 scan_snap[BB_NSRC]; /* publish one complete ordered scan, never a partial A/B batch */
 static unsigned tap_selected_mask; /* include attempted selections whose acknowledgement may be lost */
 
 typedef int (*sio2_xfer_fn)(sio2_transfer_data_t *td);
@@ -189,13 +191,15 @@ void bbpad_tick(void)
             age[i]++;
 }
 
-void bbpad_sample(uint16_t masks[BB_NSRC])
+unsigned bbpad_sample(uint16_t masks[BB_NSRC])
 {
-    unsigned i;
+    unsigned i, present = 0;
     for (i = 0; i < BB_NSRC; i++) {
-        u32 v = snap[i];
-        if ((v & 0x80000000u) && age[i] < AGE_LIMIT_TICKS)
+        u32 v = any_slots ? scan_snap[i] : snap[i];
+        if ((v & 0x80000000u) && age[i] < AGE_LIMIT_TICKS) {
             masks[i] = (uint16_t)(v & 0xFFFF);
+            present |= 1u << i;
+        }
     }
     /* Deliberately user-gated: no game-screen detection is possible here.
      * Select is unbound on a whole-pad slot A. Select+Start can join the
@@ -216,6 +220,7 @@ void bbpad_sample(uint16_t masks[BB_NSRC])
                          ((installed_ticks % 500) < 63 ? colour[st] : 0);
         }
     }
+    return present;
 }
 
 int bbpad_state(void) { return state; }
@@ -394,18 +399,30 @@ static void poll_session(unsigned flags, int need_a, int need_tap_cycle, int nee
         real_end();
         return;
     }
-    if (need_a) {
+    if (need_detect && any_slots)
+        tap_detect(flags);
+    if (need_a || (any_slots && need_tap_cycle)) {
         bb_td_reset(&btd);
         for (p = 0; p < BB_PORTS; p++)
-            bb_td_add_pad_read(&btd, p);
-        if (!((send_td() >> 13) & 1))
+            /* A PADMAN read can supply A, but traffic on port 1 must never
+             * suppress discovering an idle/new pad on port 2. */
+            if (need_a || age[BB_SRC(p, 0)] >= 8 || !(snap[BB_SRC(p, 0)] & 0x80000000u))
+                bb_td_add_pad_read(&btd, p);
+        if (btd.n && !((send_td() >> 13) & 1))
             take_reads(0);
         poll_count++;
     }
-    if (need_detect)
+    if (need_detect && !any_slots)
         tap_detect(flags);
     if (need_tap_cycle)
         tap_cycle(flags);
+    if (any_slots && need_tap_cycle) {
+        int st;
+        CpuSuspendIntr(&st);
+        for (p = 0; p < BB_NSRC; p++)
+            scan_snap[p] = age[p] < 16 ? snap[p] : 0;
+        CpuResumeIntr(st);
+    }
     real_end();
 }
 
@@ -417,7 +434,9 @@ void bbpad_configure(unsigned layout_id, unsigned flags)
     if (bb_layout_build(layout_id, &lay) != 0)
         bb_layout_build(BB_LAYOUT_buzzers, &lay);
     bb_layout_taps(&lay, tap_wanted);
-    diag_tap = flags & BB_FLAG_DIAG_TAP;
+    any_slots = lay.any_slots;
+    /* The CLI refuses this combination; never synthesize onto unknown bindings. */
+    diag_tap = any_slots ? 0 : flags & BB_FLAG_DIAG_TAP;
     for (p = 0; p < BB_PORTS; p++) {
         unsigned s;
         tap_slots[p] = 0;

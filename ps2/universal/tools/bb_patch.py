@@ -38,8 +38,12 @@ EMBEDDED_LAYOUTS = [
     (6, 'four_ds_tap1', '4 DualShocks on a multitap in port 1 (4 players)'),
     (7, 'buzzers_ds2_tap2', 'Buzz! buzzers + 2 DualShocks on a multitap in port 2 (4 players)'),
     (8, 'eight_ds_tap12', '8 DualShocks on two multitaps (8 players, quiz games)'),
+    (9, 'any_buzzers_ds', 'Buzz! buzzers + DualShocks on any slots (4 players)'),
+    (10, 'any_ds4', 'DualShocks on any slots (up to 4 players)'),
+    (11, 'any_2buzzers_ds', '2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)'),
+    (12, 'any_ds8', 'DualShocks on any slots (up to 8 players)'),
 ]
-MULTITAP_LAYOUTS = (5, 6, 7, 8)
+MULTITAP_LAYOUTS = (5, 6, 7, 8, 9, 10, 11, 12)
 KNOWN_USBD = {
     'cbae284db35baceeaaed642351df99817ec47586': 'Sony USBD 1.3.0 (Schools/Mega family)',
     '80ebc1a552dffaf5640714b69bac4cbc173e3d22': 'Sony USBD 1.4.0 (Junior family)',
@@ -227,7 +231,7 @@ DIAG_TAP_HELP = ('hold Select+Start on the multitap slot A controller to join th
 
 
 def ask_diag_tap(console):
-    print('Turn on the multitap check (for testing on a PS3)? It shows on screen whether the multitap answers.')
+    print('Turn on the multitap check? It shows on screen whether the multitap answers.')
     try:
         answer = input('Multitap check, y/N: ').strip().lower()
     except EOFError:
@@ -244,11 +248,18 @@ def ask_layout(console=None):
             names = ('Buzz! buzzers only', 'Buzz! buzzers + 1 DualShock',
                      '2 DualShocks, shared', '2 DualShocks, one player each', '1 DualShock, shared',
                      'Buzz! buzzers + 2 DualShocks (multitap port 1)', '4 DualShocks (multitap port 1)',
-                     'Buzz! buzzers + 2 DualShocks (multitap port 2)', '8 DualShocks (multitap ports 1+2)')
+                     'Buzz! buzzers + 2 DualShocks (multitap port 2)', '8 DualShocks (multitap ports 1+2)',
+                     'Buzz! buzzers + DualShocks on any slots (4 players)',
+                     'DualShocks on any slots (up to 4 players)',
+                     '2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)',
+                     'DualShocks on any slots (up to 8 players)')
             if i == MULTITAP_LAYOUTS[0]:
-                print('  Multitap (beta: works in PCSX2, PS3 in testing):', flush=True)
+                print('  Multitap (beta): any-slot setups need no PS3 CONFIG; controllers can sit on any slot.', flush=True)
+            if i >= 9:
+                print('  %s  %s' % (console.paint(str(i + 1) + ')', '1;96'), desc), flush=True)
+                continue
             print('  %s  %-48s %d players' %
-                  (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2, 4, 4, 4, 8)[i]), flush=True)
+                  (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2, 4, 4, 4, 8, 4, 4, 8, 8)[i]), flush=True)
         else:
             print('%d) %s' % (i + 1, desc))
     while True:
@@ -412,8 +423,10 @@ def cmd_patch(args):
         flags |= FLAG_POLL_AUTO
         args.poll = 'auto'
     diag_tap = args.diag_tap
-    if layout in MULTITAP_LAYOUTS and args.layout is None and not diag_tap:
+    if layout in MULTITAP_LAYOUTS and layout < 9 and args.layout is None and not diag_tap:
         diag_tap = ask_diag_tap(console)
+    if diag_tap and layout >= 9:
+        raise PatchError('--diag-tap is not supported for any-slot setups; use a fixed-slot multitap setup for diagnostics')
     if diag_tap:
         if layout not in MULTITAP_LAYOUTS or args.no_pad or args.script_demo:
             raise PatchError('--diag-tap needs a multitap setup with pad input enabled')
@@ -556,7 +569,7 @@ def main(argv=None, console=None):
     dest = ap.add_mutually_exclusive_group()
     dest.add_argument('--out', help='path for patched copy (default: <name> (Buzz Bridge).iso)')
     dest.add_argument('--in-place', action='store_true', help='modify input instead of creating a copy')
-    ap.add_argument('--layout', help='0-4 or name; omit to choose your setup interactively')
+    ap.add_argument('--layout', help='0-12 or name; omit to choose your setup interactively')
     ap.add_argument('--poll', choices=['off', 'auto', 'always'], default='auto', help='default auto; always is diagnostic')
     ap.add_argument('--diag-tap', action='store_true',
                     help='multitap setups: show the multitap state as colour flashes (hold Select on slot A)')

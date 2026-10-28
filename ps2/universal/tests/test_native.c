@@ -30,7 +30,7 @@ static void *last_gp_seen;
 int vos_lock(void) { return 0; }
 void vos_unlock(int s) { (void)s; }
 unsigned vos_flags(void) { return mock_flags; }
-void vos_sample(uint16_t m[BB_NSRC]) { memcpy(m, mock_masks, sizeof mock_masks); }
+unsigned vos_sample(uint16_t m[BB_NSRC]) { memcpy(m, mock_masks, sizeof mock_masks); return 0xFF; }
 void vos_call_done(vu_done_t cb, int result, int count, void *arg, void *gp)
 {
     last_gp_seen = gp;
@@ -207,7 +207,7 @@ static void test_layouts(void)
     /* layout names line up with the X-macro list */
     CHECK(strcmp(bb_layout_name(0), "buzzers") == 0);
     CHECK(strcmp(bb_layout_name(4), "one_ds_shared") == 0);
-    CHECK(BB_LAYOUT_COUNT == 9);
+    CHECK(BB_LAYOUT_COUNT == 13);
 }
 
 static void test_script(void)
@@ -1149,8 +1149,69 @@ static void test_two_dongles(void)
     CHECK(vusb_scan_descriptor(2, NULL, 1) == NULL);
 }
 
+static void test_any_assignment(void)
+{
+    bb_layout_t l;
+    bb_assign_t a;
+    uint16_t m[BB_NSRC] = {0};
+    uint8_t taps[2];
+    unsigned id, s;
+    for (id = 9; id <= 12; id++) {
+        CHECK(bb_layout_build(id, &l) == 0);
+        CHECK(l.ndongles == (id >= 11 ? 2 : 1));
+        CHECK(bb_layout_taps(&l, taps) == 2 && taps[0] == 14 && taps[1] == 14);
+    }
+    bb_layout_build(9, &l);
+    bb_assign_init(&a);
+    bb_assign_update(&a, &l, 9, (1u << 0) | (1u << 4) | (1u << 6), 0);
+    CHECK(l.h[0].src == 0 && l.h[1].src == 0); /* buzzer first */
+    CHECK(a.owner[4] == 2 && a.owner[6] == 3);
+    m[0] = PADB_SQUARE | PADB_R1;
+    m[4] = PADB_UP;
+    m[6] = PADB_CROSS;
+    CHECK(bb_map(&l, m) == (W(0, BZ_RED) | W(1, BZ_RED) | W(2, BZ_BLUE) | W(3, BZ_YELLOW)));
+    bb_assign_update(&a, &l, 9, 0xFF & ~(1u << 4), 2999);
+    CHECK(a.owner[4] == 2 && a.owner[6] == 3 && a.owner[1] == BB_NOSRC);
+    bb_assign_update(&a, &l, 9, 0xFF, 2999); /* return inside timeout */
+    bb_assign_update(&a, &l, 9, 0xFF & ~(1u << 4), 5998);
+    CHECK(a.owner[4] == 2);
+    bb_assign_update(&a, &l, 9, 0xFF & ~(1u << 4), 5999);
+    CHECK(a.owner[4] == BB_NOSRC && a.owner[1] == 2 && a.owner[6] == 3);
+    bb_layout_build(11, &l);
+    bb_assign_init(&a);
+    bb_assign_update(&a, &l, 11, 0xFF, 0);
+    CHECK(a.owner[0] == 0 && a.owner[1] == 4);
+    CHECK(a.owner[2] == 2 && a.owner[3] == 3 && a.owner[4] == 6 && a.owner[5] == 7);
+    CHECK(a.owner[6] == BB_NOSRC && a.owner[7] == BB_NOSRC);
+    CHECK(l.h[4].src == 1 && l.h[5].src == 1);
+    bb_assign_update(&a, &l, 11, 0xFE, 3000);
+    CHECK(a.owner[1] == 4 && a.owner[2] == 2 && a.owner[6] == 0); /* no reshuffle */
+    bb_layout_build(10, &l);
+    bb_assign_init(&a);
+    bb_assign_update(&a, &l, 10, 0xF0, 0xFFFFFF00u);
+    bb_assign_update(&a, &l, 10, 0, 0xFFFFFF00u + 2999u);
+    CHECK(a.owner[4] == 0); /* wrap */
+    bb_assign_update(&a, &l, 10, 1, 0xFFFFFF00u + 3000u);
+    CHECK(a.owner[4] == BB_NOSRC && a.owner[0] == 0);
+    bb_layout_build(12, &l);
+    bb_assign_init(&a);
+    bb_assign_update(&a, &l, 12, 0xFF, 0);
+    for (s = 0; s < 8; s++) CHECK(a.owner[s] == s);
+    bb_layout_build(10, &l);
+    bb_assign_init(&a);
+    bb_assign_update(&a, &l, 10, 0x80, 0);
+    bb_assign_update(&a, &l, 10, 0x81, 32);
+    CHECK(a.owner[7] == 0 && a.owner[0] == 1); /* lower slot appears late */
+    for (s = 0; s < 16; s++) {
+        memset(m, 0, sizeof m);
+        m[7] = (uint16_t)(1u << s);
+        CHECK(bb_map(&l, m) != 0); /* every digital button belongs to this handset */
+    }
+}
+
 int main(void)
 {
+    test_any_assignment();
     test_descriptors();
     test_report_pack();
     test_layouts();

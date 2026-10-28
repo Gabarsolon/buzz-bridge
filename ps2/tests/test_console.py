@@ -74,12 +74,13 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual(self.iso.read_bytes(), self.original)
 
     def test_every_layout_shows_its_own_buttons(self):
-        for layout in range(9):
+        for layout in range(13):
             target = Path(self.temp.name) / ('layout%d.iso' % layout)
             rc, out, err = self.terminal_run('--layout', str(layout), '--out', str(target))
             self.assertEqual(rc, 0, err)
             self.assertIn('Red (buzz)', out)
             self.assertEqual('PS3 wired buzzers (port 1):' in out, layout in (0, 1, 5, 7))
+            self.assertEqual('PS3 wired buzzers (lowest occupied slot' in out, layout in (9, 11))
             self.assertEqual('DualShock buttons' in out, layout != 0)
             if layout == 3:
                 self.assertIn('Either half works.', out)

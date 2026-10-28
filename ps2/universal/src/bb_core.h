@@ -58,6 +58,7 @@ typedef struct {
 typedef struct {
     bb_bind_t h[BB_ALL_HANDSETS]; /* handsets 0-3 = dongle 1, 4-7 = dongle 2 */
     uint8_t ndongles;             /* 1 or 2 virtual dongles */
+    uint8_t any_slots;            /* scan both ports, even before any bindings exist */
 } bb_layout_t;
 
 enum {
@@ -70,6 +71,18 @@ enum {
 /* Fills out for layout id. Returns 0, or -1 for an unknown id (out = all unbound). */
 int bb_layout_build(unsigned id, bb_layout_t *out);
 const char *bb_layout_name(unsigned id);
+
+/* Sticky ownership, measured in milliseconds with unsigned wrap-safe subtraction.
+ * No wire discriminator exists: allocate buzzer roles first, then whole pads.
+ * Call once per complete scan, in port-major source order. */
+#define BB_ASSIGN_TIMEOUT_MS 3000u
+typedef struct {
+    uint8_t owner[BB_NSRC]; /* first handset, or BB_NOSRC */
+    uint32_t seen[BB_NSRC];
+} bb_assign_t;
+void bb_assign_init(bb_assign_t *a);
+void bb_assign_update(bb_assign_t *a, bb_layout_t *lay, unsigned id,
+                      unsigned present, uint32_t ms);
 
 /* 20-bit buzzer word (bit = handset*5 + colour) of one dongle from the per-source pad masks. */
 uint32_t bb_map_dongle(const bb_layout_t *lay, const uint16_t src_masks[BB_NSRC], unsigned dongle);

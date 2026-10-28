@@ -10,3 +10,7 @@ BB_LAYOUT(5, buzzers_ds2_tap1, "MULTITAP on port 1: buzzers (slot A) = handsets 
 BB_LAYOUT(6, four_ds_tap1,  "MULTITAP on port 1: DualShocks in slots A-D = handsets 1-4, one player each (whole pad)")
 BB_LAYOUT(7, buzzers_ds2_tap2, "MULTITAP on port 2: buzzers on port 1 = handsets 1-2, DualShocks in port 2 slots A and B = handsets 3 and 4 (whole pad each)")
 BB_LAYOUT(8, eight_ds_tap12, "MULTITAP on both ports, TWO virtual dongles: port 1 slots A-D = handsets 1-4, port 2 slots A-D = handsets 5-8 (whole pad each)")
+BB_LAYOUT(9, any_buzzers_ds, "Buzz! buzzers + DualShocks on any slots (4 players)")
+BB_LAYOUT(10, any_ds4, "DualShocks on any slots (up to 4 players)")
+BB_LAYOUT(11, any_2buzzers_ds, "2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)")
+BB_LAYOUT(12, any_ds8, "DualShocks on any slots (up to 8 players)")

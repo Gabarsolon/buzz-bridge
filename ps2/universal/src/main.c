@@ -56,7 +56,7 @@ void vos_unlock(int st) { CpuResumeIntr(st); }
 
 unsigned vos_flags(void) { return bb_cfg.flags; }
 
-void vos_sample(uint16_t masks[BB_NSRC]) { bbpad_sample(masks); }
+unsigned vos_sample(uint16_t masks[BB_NSRC]) { return bbpad_sample(masks); }
 
 /* gpcall.S: runs fn(a, b, c) with the client's $gp and puts our own back afterwards */
 extern int bb_call3(void *fn, void *gp, int a, int b, int c);
