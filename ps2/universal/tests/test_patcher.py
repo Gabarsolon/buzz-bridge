@@ -337,20 +337,21 @@ class SafetyTests(unittest.TestCase):
         cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
         self.assertEqual((cfg['layout'], cfg['flags']), (2, 0x11))
 
-    def test_interactive_multitap_asks_for_the_check(self):
-        rc, so, se = run(self.p, input_text=['8', 'y'])
-        self.assertEqual(rc, 0, se)
-        self.assertIn('Turn on the multitap check', so)
-        self.assertIn('Multitap check ON', so)
-        cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
-        self.assertEqual((cfg['layout'], cfg['flags']), (7, 0x19))
-
-    def test_interactive_any_slot_does_not_ask_for_the_check(self):
-        rc, so, se = run(self.p, input_text=['10'])
+    def test_menu_maps_choices_to_layouts_and_has_no_fixed_multitap_setups(self):
+        rc, so, se = run(self.p, input_text=['6'])
         self.assertEqual(rc, 0, se)
         self.assertNotIn('Turn on the multitap check', so)
+        self.assertNotIn('CONFIG', so)
+        self.assertNotIn('port 1)', so)
         cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
         self.assertEqual((cfg['layout'], cfg['flags']), (9, 0x11))
+
+    def test_menu_player_column_is_aligned(self):
+        rc, so, se = run(self.p, input_text=['1'])
+        self.assertEqual(rc, 0, se)
+        rows = [l for l in so.splitlines() if l[:3].strip().rstrip(')').isdigit() and ' players' in l]
+        self.assertEqual(len(rows), 9)
+        self.assertEqual(len(set(l.index(' players') for l in rows)), 1, rows)
 
     def test_info_writes_nothing_and_reports_patched_config(self):
         before = sorted(os.listdir(self.tmp))

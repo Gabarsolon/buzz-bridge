@@ -116,13 +116,13 @@ class Console:
             if layout == 11:
                 self.line('Second buzzer pad: same buttons for handsets 5 and 6.')
         if layout >= 9:
-            self.line('No PS3 CONFIG needed. Connect buzzers before launch in the lowest occupied slot(s).')
+            self.line('Connect the buzzers before launch, in the lowest occupied slot(s).')
             self.line('Handsets stay assigned; a missing pad releases its handset after about 3 seconds.')
             self.line('Select, Start, L3 and R3 also buzz red on a DualShock.')
         if layout >= 5:
             self.line('DualShock buttons (one player per controller, either half works):')
             self.table('Left half', 'Right half', SHARED)
-            self.line('PCSX2: Settings > Controllers > Global Settings > Multitap. Any-slot setups await live testing.')
+            self.line('PCSX2: Settings > Controllers > Global Settings > Multitap on Console Port 1/2.')
             if layout < 9:
                 self.line('PS3: CONFIG needed unless controllers happen to land on the required fixed slots.')
         elif layout != 0:

@@ -75,43 +75,25 @@ Restoration refuses wrong checksums, changed extents and unrelated USBD edits. R
 
 ## Setups and controller buttons
 
-Menu choices are **1–13**. CLI layout IDs are **0–12**:
+Menu choices are **1-9**. Command-line layout IDs are **0-12** (IDs 5-8 are older fixed-slot multitap setups that are not in the menu):
 
 | Menu | CLI ID / name | Controller port 1 | Controller port 2 | Players |
 |---|---|---|---|---|
-| 1. Buzz! buzzers only | `0` / `buzzers` | PS3-mapped wired dongle: handsets 1–2 | Unused | 2 |
-| 2. Buzz! buzzers + 1 DualShock (4 players) | `1` / `buzzers_ds` | PS3-mapped wired dongle: handsets 1–2 | Split: players 3–4 | 4 |
-| 3. 2 DualShocks, 2 players each (4 players) | `2` / `two_ds_shared` | Split: players 1–2 | Split: players 3–4 | 4 |
-| 4. 2 DualShocks, 1 player each | `3` / `two_ds_single` | Whole controller: player 1 | Whole controller: player 2 | 2 |
-| 5. 1 DualShock, 2 players | `4` / `one_ds_shared` | Split: players 1–2 | Unused | 2 |
-| 6. Buzz! buzzers + 2 DualShocks, multitap port 1 (beta) | `5` / `buzzers_ds2_tap1` | Multitap: 1-A buzzers (handsets 1–2), 1-B player 3, 1-C player 4 | Unused | 4 |
-| 7. 4 DualShocks, multitap port 1 (beta) | `6` / `four_ds_tap1` | Multitap: 1-A to 1-D = players 1–4 | Unused | 4 |
-| 8. Buzz! buzzers + 2 DualShocks, multitap port 2 (beta) | `7` / `buzzers_ds2_tap2` | PS3-mapped wired dongle: handsets 1–2 | Multitap: 2-A player 3, 2-B player 4 | 4 |
-| 9. 8 DualShocks, multitaps on both ports (beta) | `8` / `eight_ds_tap12` | Multitap: 1-A to 1-D = players 1–4 | Multitap: 2-A to 2-D = players 5–8 (second virtual buzzer set) | 8 |
-| 10. Buzz! buzzers + DualShocks on any slots (4 players) | `9` / `any_buzzers_ds` | Both ports scanned; lowest occupied slot = buzzer handsets 1–2 | Up to 2 whole DualShocks on any other slots = handsets 3–4 | 4 |
-| 11. DualShocks on any slots (up to 4 players) | `10` / `any_ds4` | Both ports scanned | Up to 4 whole DualShocks on any slots | 4 |
-| 12. 2 pairs of Buzz! buzzers + DualShocks on any slots (8 players) | `11` / `any_2buzzers_ds` | Lowest 2 occupied slots = buzzer pads A/B, handsets 1–2 / 5–6 | Up to 4 whole DualShocks on other slots = handsets 3,4,7,8 | 8 |
-| 13. DualShocks on any slots (up to 8 players) | `12` / `any_ds8` | Both ports scanned | Up to 8 whole DualShocks on any slots; two virtual dongles | 8 |
+| 1. Buzz! buzzers only | `0` / `buzzers` | PS3-mapped wired dongle: handsets 1-2 | Unused | 2 |
+| 2. Buzz! buzzers + 1 DualShock | `1` / `buzzers_ds` | PS3-mapped wired dongle: handsets 1-2 | Split: players 3-4 | 4 |
+| 3. 2 DualShocks, shared | `2` / `two_ds_shared` | Split: players 1-2 | Split: players 3-4 | 4 |
+| 4. 2 DualShocks, one player each | `3` / `two_ds_single` | Whole controller: player 1 | Whole controller: player 2 | 2 |
+| 5. 1 DualShock, shared | `4` / `one_ds_shared` | Split: players 1-2 | Unused | 2 |
+| 6. Buzz! buzzers + 2 DualShocks (multitap, any slots) | `9` / `any_buzzers_ds` | Both ports scanned; lowest occupied slot = buzzer handsets 1-2 | Up to 2 whole DualShocks on any other slots = handsets 3-4 | 4 |
+| 7. 4 DualShocks (multitap, any slots) | `10` / `any_ds4` | Both ports scanned | Up to 4 whole DualShocks on any slots | 4 |
+| 8. 2 pairs of Buzz! buzzers + 4 DualShocks (multitap, any slots) | `11` / `any_2buzzers_ds` | Lowest 2 occupied slots = buzzer pads A/B, handsets 1-2 / 5-6 | Up to 4 whole DualShocks on other slots = handsets 3,4,7,8 | 8 |
+| 9. 8 DualShocks (multitap, any slots) | `12` / `any_ds8` | Both ports scanned | Up to 8 whole DualShocks on any slots; two virtual dongles | 8 |
 
-**Multitap setups (beta):** each DualShock on a multitap is one whole player (either half of the controller works, buttons as in the table below). In PCSX2, tick **Settings → Controllers → Global Settings → Multitap on Console Port 1/2** and set the slots (Controller Port 1A–1D / 2A–2D) to DualShock 2. Tested in PCSX2 with Buzz! The Schools Quiz (4 and 8 controllers). Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of…), not Buzz! Junior or The Music Quiz (4 players).
+**Multitap setups (6-9):** each DualShock is one whole player (either half of the controller works, buttons as in the table below) and it can sit on any slot of any multitap, so nothing needs to be configured. On a PS3, put each controller on a slot with the PS button as usual; the bridge reads all slots. In PCSX2, tick **Settings > Controllers > Global Settings > Multitap on Console Port 1/2** and set the slots (Controller Port 1A-1D / 2A-2D) to DualShock 2. Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of...), not Buzz! Junior or The Music Quiz (4 players).
 
-**Any-slot setups on PS3 (IDs 9–12): no CONFIG is needed.** The bridge reads both ports and all available slots. Netemu enables taps by default (CONFIG 1C mask 3); assigning a controller to B/C/D makes that port's tap present. Controllers can stay wherever netemu assigns them. An existing custom CONFIG that disables a port's multitap must be removed or corrected.
+**Multitap assignment:** a valid idle pad counts as present. On each complete scan, new pads are considered in order 1-A, 1-B, 1-C, 1-D, 2-A, 2-B, 2-C, 2-D. There is no reliable Buzz-pad identifier in the normal pad replies: for setup 6 the first pad gets the buzzer role; for setup 8 the first two do. **Connect the buzzer pads before launch and keep them in the lowest occupied slot(s).** Their two mapped handsets become 1–2 and, for the second pair, 5–6. Handsets 3 and 4 of each physical dongle remain unavailable through netemu's pad mapping.
 
-**Older fixed-slot setups on PS3 (IDs 5–8): a CONFIG is needed unless controllers happen to land on the required slots.** These setups read only their named slots. Netemu's default order is 1-A, 2-A, 1-B, 2-B, and so on, so it commonly differs from the fixed setup. Each controller can only reassign itself using its own PS button; that does not work on every controller. A CONFIG can enable/force the intended tap, but cannot assign controllers or make a fixed layout read an unrelated slot. Prefer an any-slot setup when controllers cannot be reassigned.
-
-For a fixed setup, put a `.CONFIG` next to the ISO with the same name plus `.CONFIG` (for example `My Game.iso.CONFIG`). This example enables and forces the tap on port 2 (use `01` instead of `02` in both places for port 1, or `03` for both ports):
-
-```text
-3D 00 00 00 57 44 00 00 1C 00 00 00 02 00 00 00 1D 00 00 00 02 00 00 00
-```
-
-The first PS3 build only read slot A: netemu answers multitap commands in a different form than PCSX2. Since v1.2.0 the module accepts both forms.
-
-**Multitap check (fixed-slot setups 5–8 only):** the patcher asks whether to turn it on for multitap setups (`--diag-tap` on the command line). In the game, hold **Select+Start** on the controller in the multitap's slot A: the last multitap player presses red and joins. Keep holding **Select** and watch that player for 4 seconds: it flashes **blue** = no multitap answer, **orange** = slot change refused, **yellow** = no controller data, **green** = working. Release Select to play normally. Use a copy without the check for normal play. The patcher explicitly refuses `--diag-tap` with IDs 9–12 because its synthetic target assumes fixed slot bindings; answer No to the check prompt for those setups.
-
-**Any-slot assignment:** a valid idle pad counts as present. On each complete scan, new pads are considered in order 1-A, 1-B, 1-C, 1-D, 2-A, 2-B, 2-C, 2-D. There is no reliable Buzz-pad identifier in the normal pad replies: for ID 9 the first pad gets the buzzer role; for ID 11 the first two do. **Connect the buzzer pads before launch and keep them in the lowest occupied slot(s).** Their two mapped handsets become 1–2 and, for the second pair, 5–6. Handsets 3 and 4 of each physical dongle remain unavailable through netemu's pad mapping.
-
-Each discovered pad keeps its handset(s). A missing pad stops sending buttons immediately and reserves its assignment for about 3 seconds; returning inside that time keeps the assignment. Other players never move. After the timeout a waiting extra pad can take the free assignment; reconnect a buzzer before other new pads if its reservation expired. Excess pads are ignored. Game seat order follows who presses blue first, independently of handset numbers. Select, Start, L3 and R3 also buzz red on whole DualShocks in IDs 9–12; the usual two halves supply the five colours.
+Each discovered pad keeps its handset(s). A missing pad stops sending buttons immediately and reserves its assignment for about 3 seconds; returning inside that time keeps the assignment. Other players never move. After the timeout a waiting extra pad can take the free assignment; reconnect a buzzer before other new pads if its reservation expired. Excess pads are ignored. Game seat order follows who presses blue first, independently of handset numbers. Select, Start, L3 and R3 also buzz red on whole DualShocks in setups 6–9; the usual two halves supply the five colours.
 
 **Shared DualShock:** the left half belongs to the first player on that port, the right half to the second. Shapes below refer to the buttons printed on the controller:
 
@@ -154,7 +136,7 @@ This is a test procedure; the universal module has **not yet been verified on ps
 1. Patch the ISO on the PC. Choose the setup matching your buzzers/controllers.
 2. Copy the **patched ISO** to **`/dev_hdd0/PS2ISO/`** on the PS3.
 3. Mount it with **webMAN** and start the mounted game through your usual PS2 launcher.
-4. For IDs 9–12, leave controllers on any assigned slots and keep buzzer pads in the lowest occupied slots; no CONFIG is needed. For older fixed setups, assign controllers to ports and slots as the layout requires. For wired buzzers, the dongle's mapped controller must be port 1; the additional shared DualShock must be port 2 for layout 1. Controller assignment is part of the pending PS3 test.
+4. For setups 6–9, leave controllers on whatever slots netemu assigns and keep buzzer pads in the lowest occupied slots. For setups 1–5, assign controllers to ports as the setup requires: the dongle's mapped controller must be port 1, and the additional shared DualShock must be port 2 for setup 2.
 
 No PS3 system or emulator files are patched. The virtual USBD does not pass through other USB devices; buzzer lights and EyeToy are not provided.
 

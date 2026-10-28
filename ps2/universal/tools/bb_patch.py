@@ -230,46 +230,39 @@ DIAG_TAP_HELP = ('hold Select+Start on the multitap slot A controller to join th
                  'refused, yellow = no controller data, green = working. Release Select to play normally.')
 
 
-def ask_diag_tap(console):
-    print('Turn on the multitap check? It shows on screen whether the multitap answers.')
-    try:
-        answer = input('Multitap check, y/N: ').strip().lower()
-    except EOFError:
-        return False
-    return answer in ('y', 'yes')
+MENU = (
+    (0, 'Buzz! buzzers only', 2),
+    (1, 'Buzz! buzzers + 1 DualShock', 4),
+    (2, '2 DualShocks, shared', 4),
+    (3, '2 DualShocks, one player each', 2),
+    (4, '1 DualShock, shared', 2),
+    (9, 'Buzz! buzzers + 2 DualShocks (multitap, any slots)', 4),
+    (10, '4 DualShocks (multitap, any slots)', 4),
+    (11, '2 pairs of Buzz! buzzers + 4 DualShocks (multitap, any slots)', 8),
+    (12, '8 DualShocks (multitap, any slots)', 8),
+)
 
 
 def ask_layout(console=None):
     console = console or Console()
     console.section(2, 'Your setup')
     print('What do you have?')
-    for i, _, desc in EMBEDDED_LAYOUTS:
+    width = max(len(name) for _, name, _ in MENU)
+    for n, (layout_id, name, players) in enumerate(MENU, 1):
+        if layout_id == 9:
+            print('  Multitap: controllers can sit on any slot.', flush=True)
+        label = '%d)' % n
         if console.enabled:
-            names = ('Buzz! buzzers only', 'Buzz! buzzers + 1 DualShock',
-                     '2 DualShocks, shared', '2 DualShocks, one player each', '1 DualShock, shared',
-                     'Buzz! buzzers + 2 DualShocks (multitap port 1)', '4 DualShocks (multitap port 1)',
-                     'Buzz! buzzers + 2 DualShocks (multitap port 2)', '8 DualShocks (multitap ports 1+2)',
-                     'Buzz! buzzers + DualShocks on any slots (4 players)',
-                     'DualShocks on any slots (up to 4 players)',
-                     '2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)',
-                     'DualShocks on any slots (up to 8 players)')
-            if i == MULTITAP_LAYOUTS[0]:
-                print('  Multitap (beta): any-slot setups need no PS3 CONFIG; controllers can sit on any slot.', flush=True)
-            if i >= 9:
-                print('  %s  %s' % (console.paint(str(i + 1) + ')', '1;96'), desc), flush=True)
-                continue
-            print('  %s  %-48s %d players' %
-                  (console.paint(str(i + 1) + ')', '1;96'), names[i], (2, 4, 4, 2, 2, 4, 4, 4, 8, 4, 4, 8, 8)[i]), flush=True)
-        else:
-            print('%d) %s' % (i + 1, desc))
+            label = console.paint(label, '1;96')
+        print('  %s  %-*s  %d players' % (label, width, name, players), flush=True)
     while True:
         try:
-            answer = input('Choose 1-%d: ' % len(EMBEDDED_LAYOUTS)).strip()
+            answer = input('Choose 1-%d: ' % len(MENU)).strip()
         except EOFError:
             raise PatchError('no setup selected; use --layout for non-interactive use') from None
-        if answer.isdigit() and 1 <= int(answer) <= len(EMBEDDED_LAYOUTS):
-            return int(answer) - 1
-        print('Please enter a number from 1 to %d.' % len(EMBEDDED_LAYOUTS))
+        if answer.isdigit() and 1 <= int(answer) <= len(MENU):
+            return MENU[int(answer) - 1][0]
+        print('Please enter a number from 1 to %d.' % len(MENU))
 
 
 def same_file(a, b):
@@ -423,8 +416,6 @@ def cmd_patch(args):
         flags |= FLAG_POLL_AUTO
         args.poll = 'auto'
     diag_tap = args.diag_tap
-    if layout in MULTITAP_LAYOUTS and layout < 9 and args.layout is None and not diag_tap:
-        diag_tap = ask_diag_tap(console)
     if diag_tap and layout >= 9:
         raise PatchError('--diag-tap is not supported for any-slot setups; use a fixed-slot multitap setup for diagnostics')
     if diag_tap:
