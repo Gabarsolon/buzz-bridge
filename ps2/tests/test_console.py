@@ -85,6 +85,19 @@ class ConsoleTests(unittest.TestCase):
             if layout == 3:
                 self.assertIn('Either half works.', out)
 
+    def test_custom_wizard_terminal_summary_and_no_extra_setup_question(self):
+        rc,out,err = self.terminal_run(answers=('6','1','3','2'))
+        self.assertEqual(rc,0,err)
+        for fragment in ('More than 2 controllers (any slots)','Total: 6 players','Who uses what',
+                         'Whole DualShocks','Shared DualShocks','Left player','Right player','3 / Patching'):
+            self.assertIn(fragment,out)
+        self.assertNotIn('CONFIG',out)
+        self.assertEqual(out.lower().count('multitap'),1)
+        target = self.iso.with_name('Synthetic (Buzz Bridge).iso')
+        cfg = bb_patch.read_config(target.read_bytes()[self.meta['usbd_lba']*2048:])
+        self.assertEqual((cfg['layout'],cfg['players'],cfg['dongles'],cfg['flags']),(13,6,2,0x11))
+        self.assertEqual(self.iso.read_bytes(),self.original)
+
     def test_colour_only_when_tty_and_vt_available(self):
         rc, out, err = self.terminal_run('--layout', '4', colour=True)
         self.assertEqual(rc, 0, err)

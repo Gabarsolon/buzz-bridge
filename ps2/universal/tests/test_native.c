@@ -207,7 +207,7 @@ static void test_layouts(void)
     /* layout names line up with the X-macro list */
     CHECK(strcmp(bb_layout_name(0), "buzzers") == 0);
     CHECK(strcmp(bb_layout_name(4), "one_ds_shared") == 0);
-    CHECK(BB_LAYOUT_COUNT == 13);
+    CHECK(BB_LAYOUT_COUNT == 14);
 }
 
 static void test_script(void)
@@ -1209,9 +1209,104 @@ static void test_any_assignment(void)
     }
 }
 
+static void test_custom_assignment(void)
+{
+    static const unsigned examples[][3] = {
+        {0,4,0},{0,0,2},{0,2,1},{1,2,0},{1,0,1},{1,6,0},{1,4,1},{1,2,2},
+        {1,0,3},{2,0,0},{2,4,0},{2,0,2},{0,4,2},{0,0,4},{0,8,0},{2,2,1}
+    };
+    /* Independent expected button tables: red, yellow, green, orange, blue. */
+    static const uint16_t buz[2][5] = {{0x8000,0x4000,0x2000,0x1000,0x0400},
+                                      {0x0800,0x0100,0x0200,0x0001,0x0008}};
+    static const uint16_t halves[2][5] = {{0x0400,0x0040,0x0020,0x0080,0x0010},
+                                         {0x0800,0x4000,0x2000,0x8000,0x1000}};
+    unsigned e, p, w, sh;
+    bb_layout_t l;
+    bb_assign_t a;
+    for (e = 0; e < sizeof examples / sizeof examples[0]; e++) {
+        unsigned id = BB_CUSTOM_ID(examples[e][0],examples[e][1],examples[e][2]);
+        CHECK(bb_layout_build(id, &l) == 0);
+        CHECK(l.pairs == examples[e][0] && l.whole == examples[e][1] && l.shared == examples[e][2]);
+    }
+    /* Exhaust every representable triple: reject zero/overfull, test every
+     * colour on every handset for every valid setup (not only the examples). */
+    for (p = 0; p <= 2; p++) for (w = 0; w <= 8; w++) for (sh = 0; sh <= 4; sh++) {
+        unsigned id = BB_CUSTOM_ID(p,w,sh), players = 2*p+w+2*sh;
+        unsigned r, h = 0, roles = p+w+sh;
+        int result = bb_layout_build(id, &l);
+        if (!players || players > 8) { CHECK(result == -1); continue; }
+        CHECK(result == 0 && l.any_slots && l.custom && l.ndongles == (players > 4 ? 2 : 1));
+        bb_assign_init(&a);
+        bb_assign_update(&a, &l, id, 0xFF, 10);
+        for (r = 0; r < roles; r++) {
+            unsigned c, half, width = r < p || r >= p+w ? 2 : 1;
+            CHECK(a.owner[r] == h);
+            for (half = 0; half < width; half++) {
+                CHECK(l.h[h+half].src == r);
+                for (c = 0; c < 5; c++) {
+                    uint16_t masks[BB_NSRC] = {0};
+                    masks[r] = r < p ? buz[half][c] : halves[half][c];
+                    CHECK(bb_map_dongle(&l, masks, (h+half)/4) == W((h+half)%4,c));
+                    if (width == 2 && h/4 != (h+1)/4)
+                        CHECK(bb_map_dongle(&l, masks, 1-(h+half)/4) == 0);
+                }
+            }
+            if (width == 1) {
+                unsigned bit;
+                for (bit = 0; bit < 16; bit++) {
+                    uint16_t masks[BB_NSRC] = {0}; masks[r] = 1u << bit;
+                    CHECK(bb_map_dongle(&l,masks,h/4) != 0);
+                }
+            }
+            h += width;
+        }
+        for (; r < 8; r++) CHECK(a.owner[r] == BB_NOSRC);
+        for (; h < 8; h++) CHECK(l.h[h].src == BB_NOSRC);
+    }
+    CHECK(bb_layout_build(391,&l) == -1);
+    CHECK(bb_layout_build(13,&l) == -1); /* missing counts */
+    CHECK(sizeof(bb_cfg_t) == 16);
+    /* Sparse discovery, fewer pads than roles, late lower source, reservation,
+     * returning pad, exact timeout, excess source and no survivor reshuffle. */
+    {
+        unsigned id = BB_CUSTOM_ID(1,1,1);
+        bb_layout_build(id,&l); bb_assign_init(&a);
+        bb_assign_update(&a,&l,id,(1u<<2)|(1u<<6),100);
+        CHECK(a.owner[2] == 0 && a.owner[6] == 2 && l.h[3].src == BB_NOSRC);
+        bb_assign_update(&a,&l,id,(1u<<0)|(1u<<2)|(1u<<6),200);
+        CHECK(a.owner[0] == 3 && a.owner[2] == 0 && a.owner[6] == 2);
+        bb_assign_update(&a,&l,id,(1u<<2)|(1u<<4)|(1u<<6),3199);
+        CHECK(a.owner[0] == 3 && a.owner[4] == BB_NOSRC);
+        bb_assign_update(&a,&l,id,(1u<<0)|(1u<<2)|(1u<<4)|(1u<<6),3199);
+        CHECK(a.owner[0] == 3 && a.owner[4] == BB_NOSRC);
+        bb_assign_update(&a,&l,id,(1u<<2)|(1u<<4)|(1u<<6),6198);
+        CHECK(a.owner[0] == 3 && a.owner[4] == BB_NOSRC);
+        bb_assign_update(&a,&l,id,(1u<<2)|(1u<<4)|(1u<<6),6199);
+        CHECK(a.owner[0] == BB_NOSRC && a.owner[4] == 3 && a.owner[6] == 2);
+        bb_assign_update(&a,&l,id,0xFF,6200);
+        CHECK(a.owner[0] == BB_NOSRC && a.owner[4] == 3 && a.owner[2] == 0);
+    }
+    /* A pair straddles dongles; using only one half never requires the other. */
+    {
+        unsigned id = BB_CUSTOM_ID(0,3,1);
+        uint16_t masks[BB_NSRC] = {0};
+        bb_layout_build(id,&l); bb_assign_init(&a);
+        bb_assign_update(&a,&l,id,15,0xFFFFFFF0u);
+        masks[3] = PADB_UP;
+        CHECK(bb_map_dongle(&l,masks,0) == W(3,BZ_BLUE) && bb_map_dongle(&l,masks,1) == 0);
+        masks[3] = PADB_TRIANGLE;
+        CHECK(bb_map_dongle(&l,masks,0) == 0 && bb_map_dongle(&l,masks,1) == W(0,BZ_BLUE));
+        bb_assign_update(&a,&l,id,7,0x10u);
+        CHECK(a.owner[3] == 3); /* wrap-safe reservation */
+        bb_assign_update(&a,&l,id,7,0x1000u);
+        CHECK(a.owner[3] == BB_NOSRC);
+    }
+}
+
 int main(void)
 {
     test_any_assignment();
+    test_custom_assignment();
     test_descriptors();
     test_report_pack();
     test_layouts();

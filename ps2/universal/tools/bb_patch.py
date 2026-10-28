@@ -42,6 +42,7 @@ EMBEDDED_LAYOUTS = [
     (10, 'any_ds4', 'DualShocks on any slots (up to 4 players)'),
     (11, 'any_2buzzers_ds', '2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)'),
     (12, 'any_ds8', 'DualShocks on any slots (up to 8 players)'),
+    (13, 'custom', 'More than 2 controllers (any slots): buzzer pairs, whole and shared DualShocks'),
 ]
 MULTITAP_LAYOUTS = (5, 6, 7, 8, 9, 10, 11, 12)
 KNOWN_USBD = {
@@ -206,16 +207,36 @@ def check_new_irx(data):
         raise PatchError('unsupported module configuration version')
 
 
-def write_config(data, layout_id, flags, attach_ms, heartbeat_ms):
+def custom_counts(p, w, s):
+    if not (0 <= p <= 2 and 0 <= w <= 8 and 0 <= s <= 4):
+        raise PatchError('Use 0-2 buzzer pairs, 0-8 whole DualShocks and 0-4 shared DualShocks.')
+    players = 2 * p + w + 2 * s
+    if not 1 <= players <= 8:
+        raise PatchError('Total: %d players. Choose between 1 and 8 players (maximum 8).' % players)
+    return p, w, s
+
+
+def write_config(data, layout_id, flags, attach_ms, heartbeat_ms, counts=None):
     off = data.index(CFG_MAGIC)
-    blob = struct.pack(CFG_STRUCT, CFG_MAGIC, 1, layout_id, flags, 0, attach_ms, heartbeat_ms)
+    packed = 0
+    if layout_id == 13:
+        if counts is None:
+            raise PatchError('custom needs --buzzer-pairs, --whole-ds and/or --shared-ds')
+        p, w, s = custom_counts(*counts)
+        packed = p + 3 * w + 27 * s
+    blob = struct.pack(CFG_STRUCT, CFG_MAGIC, 1, layout_id, flags, packed, attach_ms, heartbeat_ms)
     return data[:off] + blob + data[off + len(blob):]
 
 
 def read_config(data):
     off = data.index(CFG_MAGIC)
-    _, ver, layout, flags, _, attach, hb = struct.unpack_from(CFG_STRUCT, data, off)
-    return dict(version=ver, layout=layout, flags=flags, attach_delay_ms=attach, heartbeat_ms=hb)
+    _, ver, layout, flags, packed, attach, hb = struct.unpack_from(CFG_STRUCT, data, off)
+    cfg = dict(version=ver, layout=layout, flags=flags, attach_delay_ms=attach, heartbeat_ms=hb)
+    if layout == 13:
+        p, w, s = custom_counts(packed % 3, (packed // 3) % 9, packed // 27)
+        cfg.update(buzzer_pairs=p, whole_ds=w, shared_ds=s, players=2*p+w+2*s,
+                   dongles=1 if 2*p+w+2*s <= 4 else 2)
+    return cfg
 
 
 def resolve_layout(value):
@@ -236,10 +257,7 @@ MENU = (
     (2, '2 DualShocks, shared', 4),
     (3, '2 DualShocks, one player each', 2),
     (4, '1 DualShock, shared', 2),
-    (9, 'Buzz! buzzers + 2 DualShocks (any slots)', 4),
-    (10, '4 DualShocks (any slots)', 4),
-    (11, '2 pairs of Buzz! buzzers + 4 DualShocks (any slots)', 8),
-    (12, '8 DualShocks (any slots)', 8),
+    (13, 'More than 2 controllers (any slots)', '1-8'),
 )
 
 
@@ -249,12 +267,12 @@ def ask_layout(console=None):
     print('What do you have?')
     width = max(len(name) for _, name, _ in MENU)
     for n, (layout_id, name, players) in enumerate(MENU, 1):
-        if layout_id == 9:
-            print("  More than 2 controllers: no extra hardware needed, the patch uses the emulator's built-in multitap.", flush=True)
+        if layout_id == 13:
+            print("  no extra hardware needed, the patch uses the emulator's built-in multitap.", flush=True)
         label = '%d)' % n
         if console.enabled:
             label = console.paint(label, '1;96')
-        print('  %s  %-*s  %d players' % (label, width, name, players), flush=True)
+        print('  %s  %-*s  %3s players' % (label, width, name, players), flush=True)
     while True:
         try:
             answer = input('Choose 1-%d: ' % len(MENU)).strip()
@@ -263,6 +281,60 @@ def ask_layout(console=None):
         if answer.isdigit() and 1 <= int(answer) <= len(MENU):
             return MENU[int(answer) - 1][0]
         print('Please enter a number from 1 to %d.' % len(MENU))
+
+
+def ask_number(question, default, low, high):
+    while True:
+        try:
+            answer = input('%s [default: %d]: ' % (question, default)).strip()
+        except EOFError:
+            raise PatchError('setup incomplete; supply --buzzer-pairs, --whole-ds and --shared-ds for non-interactive use') from None
+        if answer == '':
+            return default
+        if answer.isdigit() and low <= int(answer) <= high:
+            return int(answer)
+        print('Please enter a whole number from %d to %d.' % (low, high))
+
+
+def custom_options(pairs, dualshocks):
+    """Every way to play with these buzzers and DualShocks: share k DualShocks (two players each), the rest one player each."""
+    usable = min(dualshocks, 8 - 2 * pairs)
+    options = []
+    for shared in range(0, min(usable, 4) + 1):
+        players = 2 * pairs + usable + shared
+        if 1 <= players <= 8:
+            options.append((players, pairs, usable - shared, shared))
+    return options
+
+
+def describe_option(pairs, whole, shared):
+    parts = []
+    if pairs:
+        parts.append('%d pair%s of Buzz! buzzers' % (pairs, '' if pairs == 1 else 's'))
+    if whole:
+        parts.append('%d DualShock%s, one player each' % (whole, '' if whole == 1 else 's'))
+    if shared:
+        parts.append('%d DualShock%s shared by two players (left half / right half)' % (shared, '' if shared == 1 else 's'))
+    return ' + '.join(parts)
+
+
+def ask_custom():
+    pairs = ask_number('How many pairs of Buzz! buzzers do you have? (each pair = 2 players)', 0, 0, 2)
+    dualshocks = ask_number('How many DualShocks do you have?', max(0, 4 - 2 * pairs), 0, 8)
+    if pairs == 0 and dualshocks == 0:
+        raise PatchError('You need at least one pair of Buzz! buzzers or one DualShock')
+    if 2 * pairs + dualshocks > 8:
+        print('Only 8 players fit: %d DualShock%s will be used.' % (8 - 2 * pairs, '' if 8 - 2 * pairs == 1 else 's'))
+    options = custom_options(pairs, dualshocks)
+    print('You can play with:')
+    for n, (players, p, whole, shared) in enumerate(options, 1):
+        print('  %d)  %d players: %s' % (n, players, describe_option(p, whole, shared)))
+    choice = 1
+    if len(options) > 1:
+        choice = ask_number('Which one?', 1, 1, len(options))
+    players, pairs, whole, shared = options[choice - 1]
+    print('Plan for %d players: %s.' % (players, describe_option(pairs, whole, shared)))
+    return custom_counts(pairs, whole, shared)
 
 
 def same_file(a, b):
@@ -405,19 +477,29 @@ def cmd_patch(args):
         else:
             print('%s: %s (%s)' % (args.iso, path, label))
     # All input/module checks precede the interactive choice and every write.
-    if args.layout is not None:
+    counts = args.custom_counts
+    if counts is not None:
+        layout = 13
+        console.section(2, 'Your setup')
+    elif args.layout is not None:
         layout = resolve_layout(args.layout)
+        if layout == 13:
+            raise PatchError('custom needs --buzzer-pairs, --whole-ds and/or --shared-ds, with --layout omitted')
         console.section(2, 'Your setup')
     else:
         layout = ask_layout(console)
-    console.setup(layout)
-    if layout in MULTITAP_LAYOUTS and args.poll == 'off':
+    if layout == 13:
+        counts = counts if counts is not None else ask_custom()
+        console.custom_setup(*counts)
+    else:
+        console.setup(layout)
+    if (layout == 13 or layout in MULTITAP_LAYOUTS) and args.poll == 'off':
         # The module reads multitap slots B-D itself; that needs its own pad poll.
         flags |= FLAG_POLL_AUTO
         args.poll = 'auto'
     diag_tap = args.diag_tap
     if diag_tap and layout >= 9:
-        raise PatchError('--diag-tap is not supported for any-slot setups; use a fixed-slot multitap setup for diagnostics')
+        raise PatchError('--diag-tap is not supported for any-slot setups (including custom); use fixed layouts 5-8 for diagnostics')
     if diag_tap:
         if layout not in MULTITAP_LAYOUTS or args.no_pad or args.script_demo:
             raise PatchError('--diag-tap needs a multitap setup with pad input enabled')
@@ -425,7 +507,7 @@ def cmd_patch(args):
         print('Multitap check ON: ' + DIAG_TAP_HELP, flush=True)
     console.section(3, 'Patching')
     console.line('Patching the ISO now. Please keep this window open.')
-    new = write_config(new, layout, flags, args.attach_delay_ms, args.heartbeat_ms)
+    new = write_config(new, layout, flags, args.attach_delay_ms, args.heartbeat_ms, counts)
     patched = new.ljust(len(orig), b'\0')
     args.space_directory = target.resolve().parent
     args.space_needed = (0 if args.in_place else image_size) + len(orig) * 3 + 65536
@@ -516,7 +598,8 @@ def cmd_restore(args):
             module = (Path(args.irx) if args.irx else HERE.parent / 'bbusbd.irx').read_bytes()
             check_new_irx(module)
             cfg = read_config(cur)
-            expected = write_config(module, cfg['layout'], cfg['flags'], cfg['attach_delay_ms'], cfg['heartbeat_ms']).ljust(len(orig), b'\0')
+            expected = write_config(module, cfg['layout'], cfg['flags'], cfg['attach_delay_ms'], cfg['heartbeat_ms'],
+                                    (cfg['buzzer_pairs'], cfg['whole_ds'], cfg['shared_ds']) if cfg['layout'] == 13 else None).ljust(len(orig), b'\0')
             if cur != expected:
                 raise PatchError('current USBD.IRX is not the bundled patched module; use matching recovery files')
         else:
@@ -561,6 +644,9 @@ def main(argv=None, console=None):
     dest.add_argument('--out', help='path for patched copy (default: <name> (Buzz Bridge).iso)')
     dest.add_argument('--in-place', action='store_true', help='modify input instead of creating a copy')
     ap.add_argument('--layout', help='0-12 or name; omit to choose your setup interactively')
+    ap.add_argument('--buzzer-pairs', type=int, help='custom: 0-2 pairs (omitted counts default to 0)')
+    ap.add_argument('--whole-ds', type=int, help='custom: 0-8 DualShocks, one person each')
+    ap.add_argument('--shared-ds', type=int, help='custom: 0-4 DualShocks, two people each')
     ap.add_argument('--poll', choices=['off', 'auto', 'always'], default='auto', help='default auto; always is diagnostic')
     ap.add_argument('--diag-tap', action='store_true',
                     help='multitap setups: show the multitap state as colour flashes (hold Select on slot A)')
@@ -574,6 +660,10 @@ def main(argv=None, console=None):
     ap.add_argument('--heartbeat-ms', type=int, default=100)
     ap.add_argument('--list-layouts', action='store_true')
     args = ap.parse_args(argv)
+    args.custom_counts = None
+    supplied = any(v is not None for v in (args.buzzer_pairs, args.whole_ds, args.shared_ds))
+    if supplied and args.layout is not None:
+        ap.error('custom count options cannot be combined with --layout; omit --layout')
     args.console = console or Console()
     if args.list_layouts:
         for i, name, desc in load_layouts():
@@ -586,6 +676,8 @@ def main(argv=None, console=None):
     if args.from_iso and not args.restore:
         ap.error('--from-iso requires --restore')
     try:
+        if supplied:
+            args.custom_counts = custom_counts(args.buzzer_pairs or 0, args.whole_ds or 0, args.shared_ds or 0)
         validate_iso_path(args.iso)
         if args.from_iso:
             validate_iso_path(args.from_iso)

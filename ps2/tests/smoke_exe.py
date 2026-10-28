@@ -49,20 +49,23 @@ def main():
             assert not list(runtime.iterdir()), 'runtime extraction was not cleaned up'
             print('PASS', ' '.join(map(str, argv)))
 
-        invoke(['--help'], 0, '--in-place')
-        invoke(['--list-layouts'], 0, 'two_ds_shared')
+        invoke(['--help'], 0, '--whole-ds')
+        invoke(['--list-layouts'], 0, 'custom')
         invoke([iso, '--info'], 0, 'UNKNOWN version')
         # Unknown refusal occurs after the bundled module's structural checks,
         # proving that frozen imports and the embedded IRX are resolved.
         invoke([iso, '--layout', '2'], 1, 'unknown USBD.IRX version')
         invoke([iso, '--restore'], 1, 'recovery JSON missing')
+        invoke([iso, '--buzzer-pairs', '1', '--whole-ds', '8'], 1, 'maximum 8')
+        invoke([iso, '--shared-ds', '2', '--layout', '0'], 2, 'cannot be combined with --layout')
+        invoke([iso, '--shared-ds', '2'], 1, 'unknown USBD.IRX version')
         invoke([iso], 1, 'Press Enter to close.', stdin='\n')
         extraction = 'This looks like a file inside a .zip. Extract the ISO first, then drag the extracted .iso here.'
         invoke([work / 'archive.ZIP', '--layout', '2'], 1, extraction)
         invoke([str(work / 'archive.zip') + '\\Game.iso', '--info'], 1, extraction)
         invoke([work / 'Missing.iso'], 1, extraction, stdin='\n')
         invoke([], 1, 'Press Enter to close.', stdin='"%s"\n\n' % iso)
-    print('10 frozen-exe smoke checks passed (synthetic ISO only).')
+    print('13 frozen-exe smoke checks passed (synthetic ISO only).')
 
 
 if __name__ == '__main__':

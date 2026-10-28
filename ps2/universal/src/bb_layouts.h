@@ -14,3 +14,4 @@ BB_LAYOUT(9, any_buzzers_ds, "Buzz! buzzers + DualShocks on any slots (4 players
 BB_LAYOUT(10, any_ds4, "DualShocks on any slots (up to 4 players)")
 BB_LAYOUT(11, any_2buzzers_ds, "2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)")
 BB_LAYOUT(12, any_ds8, "DualShocks on any slots (up to 8 players)")
+BB_LAYOUT(13, custom, "More than 2 controllers (any slots): buzzer pairs, whole and shared DualShocks")

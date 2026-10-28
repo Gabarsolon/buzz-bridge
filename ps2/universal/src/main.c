@@ -186,7 +186,7 @@ int _start(int ac, char *av[], void *startaddr, ModuleInfo_t *mi)
 {
     iop_thread_t th;
     int tid;
-    unsigned flags;
+    unsigned flags, layout;
 
     (void)av;
     (void)startaddr;
@@ -194,8 +194,9 @@ int _start(int ac, char *av[], void *startaddr, ModuleInfo_t *mi)
         return MODULE_RESIDENT_END; /* hooks cannot be removed safely: refuse to unload */
 
     flags = bb_cfg.flags;
-    vusb_init(bb_cfg.attach_delay_ms, bb_cfg.heartbeat_ms, bb_cfg.layout, flags);
-    bbpad_configure(bb_cfg.layout, flags);
+    layout = bb_cfg.layout == BB_LAYOUT_custom ? 256u + bb_cfg.reserved : bb_cfg.layout;
+    vusb_init(bb_cfg.attach_delay_ms, bb_cfg.heartbeat_ms, layout, flags);
+    bbpad_configure(layout, flags);
 
     th.attr = TH_C;
     th.thread = worker;

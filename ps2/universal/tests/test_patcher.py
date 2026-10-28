@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from unittest import mock
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
@@ -115,7 +116,7 @@ def run(*argv, input_text=None):
     known = {bb_patch.sha1(fake_usbd(n, b'usbd' + folder.encode())): 'synthetic test fixture'
              for folder in ('IOP', 'SYSTEM') for n in (8000, 34985, 34993, 35009)}
     argv = list(argv)
-    if input_text is None and not any(x in argv for x in ('--layout', '--info', '--restore', '--list-layouts')):
+    if input_text is None and not any(x in argv for x in ('--layout', '--info', '--restore', '--list-layouts', '--buzzer-pairs', '--whole-ds', '--shared-ds')):
         argv += ['--layout', 'buzzers']
     so, se = io.StringIO(), io.StringIO()
     input_mock = mock.patch('builtins.input', side_effect=input_text) if input_text is not None else contextlib.nullcontext()
@@ -205,7 +206,7 @@ class PatcherTests(unittest.TestCase):
             rc, so, se = run(p, '--out', out, '--irx', IRX, '--poll', mode)
             self.assertEqual(rc, 0, se)
             lo = meta['usbd_lba'] * SECTOR
-            self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + 20000])['flags'], flag)
+            self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + len(meta['usbd'])])['flags'], flag)
 
     def test_diag_tap_flag(self):
         p, meta = self.iso(name='diag.iso')
@@ -213,7 +214,7 @@ class PatcherTests(unittest.TestCase):
         out = os.path.join(self.tmp, 'diag7.iso')
         rc, so, se = run(p, '--out', out, '--irx', IRX, '--layout', 'buzzers_ds2_tap2', '--diag-tap')
         self.assertEqual(rc, 0, se)
-        self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + 20000])['flags'], 0x19)
+        self.assertEqual(bb_patch.read_config(rd(out)[lo:lo + len(meta['usbd'])])['flags'], 0x19)
         out = os.path.join(self.tmp, 'diag1.iso')
         rc, so, se = run(p, '--out', out, '--irx', IRX, '--layout', 'buzzers_ds', '--diag-tap')
         self.assertEqual(rc, 1)
@@ -226,19 +227,21 @@ class PatcherTests(unittest.TestCase):
         self.assertEqual(rc, 0, se + so)
         self.assertIn('/SYSTEM/USBD.IRX', so)
         lo = meta['usbd_lba'] * SECTOR
-        cfg = bb_patch.read_config(rd(out)[lo:lo + 20000])
+        cfg = bb_patch.read_config(rd(out)[lo:lo + len(meta['usbd'])])
         self.assertEqual((cfg['layout'], cfg['flags']), (3, 0x12))
 
     def test_all_layouts_and_flags(self):
         p, meta = self.iso(name='l.iso')
         for i, name, _ in bb_patch.load_layouts():
+            if i == 13:
+                continue  # custom requires counts; covered separately
             for sel in (name, str(i)):
                 out = os.path.join(self.tmp, 'l_%s.iso' % sel)
                 rc, so, se = run(p, '--out', out, '--layout', sel, '--irx', IRX, '--script-demo',
                                  '--attach-delay-ms', '250', '--heartbeat-ms', '40')
                 self.assertEqual(rc, 0, se)
                 lo = meta['usbd_lba'] * SECTOR
-                cfg = bb_patch.read_config(rd(out)[lo:lo + 20000])
+                cfg = bb_patch.read_config(rd(out)[lo:lo + len(meta['usbd'])])
                 self.assertEqual(cfg, dict(version=1, layout=i, flags=0x15, attach_delay_ms=250, heartbeat_ms=40))
         rc, so, se = run(p, '--out', os.path.join(self.tmp, 'bad.iso'), '--layout', 'nope', '--irx', IRX)
         self.assertEqual(rc, 1)
@@ -338,20 +341,135 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual((cfg['layout'], cfg['flags']), (2, 0x11))
 
     def test_menu_maps_choices_to_layouts_and_has_no_fixed_multitap_setups(self):
-        rc, so, se = run(self.p, input_text=['6'])
+        rc, so, se = run(self.p, input_text=['6', '', '', ''])
         self.assertEqual(rc, 0, se)
         self.assertNotIn('Turn on the multitap check', so)
         self.assertNotIn('CONFIG', so)
         self.assertNotIn('port 1)', so)
         cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba'] * SECTOR:])
-        self.assertEqual((cfg['layout'], cfg['flags']), (9, 0x11))
+        self.assertEqual((cfg['layout'], cfg['flags']), (13, 0x11))
 
     def test_menu_player_column_is_aligned(self):
         rc, so, se = run(self.p, input_text=['1'])
         self.assertEqual(rc, 0, se)
         rows = [l for l in so.splitlines() if l[:3].strip().rstrip(')').isdigit() and ' players' in l]
-        self.assertEqual(len(rows), 9)
+        self.assertEqual(len(rows), 6)
         self.assertEqual(len(set(l.index(' players') for l in rows)), 1, rows)
+
+    def test_custom_wizard_defaults_and_all_menu_choices(self):
+        for choice, expected in enumerate((0,1,2,3,4,13),1):
+            target = os.path.join(self.tmp,'menu_%d.iso' % choice)
+            answers = [str(choice)] + (['','',''] if choice == 6 else [])
+            rc,so,se = run(self.p,'--out',target,input_text=answers)
+            self.assertEqual(rc,0,so+se)
+            cfg = bb_patch.read_config(rd(target)[self.meta['usbd_lba']*SECTOR:])
+            self.assertEqual(cfg['layout'],expected)
+            self.assertEqual(cfg['flags'],0x11)
+            self.assertNotIn('CONFIG',so)
+            self.assertEqual(so.lower().count('multitap'),1)
+            if choice == 6:
+                self.assertEqual((cfg['buzzer_pairs'],cfg['whole_ds'],cfg['shared_ds']),(0,4,0))
+                self.assertEqual((cfg['players'],cfg['dongles']),(4,1))
+                self.assertIn('Total: 4 players',so)
+                self.assertIn('Whole DualShocks',so)
+                self.assertIn('Select, Start, L3 and R3 also buzz red.',so)
+
+    def test_custom_wizard_validation_summary_and_encoding(self):
+        rc,so,se = run(self.p,input_text=['6','bad','-1','3','1','9','2.5','3','0','9','2'])
+        self.assertEqual(rc,0,so+se)
+        self.assertEqual(so.count('Please enter a whole number'),7)
+        self.assertIn('Total: 6 players',so)
+        for fragment in ('Who uses what','Buzz! buzzer pairs','Whole DualShocks','Shared DualShocks',
+                         'LEFT half = one player; RIGHT half = another.', 'L1 / L2', 'R1 / R2',
+                         'Triangle','Square','Circle','Cross','Up','Left','Right','Down'):
+            self.assertIn(fragment,so)
+        cfg = bb_patch.read_config(rd(self.out)[self.meta['usbd_lba']*SECTOR:])
+        self.assertEqual((cfg['layout'],cfg['flags'],cfg['buzzer_pairs'],cfg['whole_ds'],cfg['shared_ds'],
+                          cfg['players'],cfg['dongles']),(13,0x11,1,2,1,6,2))
+        blob = rd(self.out)[self.meta['usbd_lba']*SECTOR:]
+        off = blob.index(bb_patch.CFG_MAGIC)
+        self.assertEqual(blob[off:off+16],struct.pack('<8sBBBBHH',b'BBZCFG01',1,13,0x11,34,100,100))
+        self.assertNotIn('CONFIG',so)
+        self.assertEqual(so.lower().count('multitap'),1)
+        rc,info,err = run(self.out,'--info')
+        self.assertEqual(rc,0,err)
+        for field in ("'buzzer_pairs': 1","'whole_ds': 2","'shared_ds': 1","'dongles': 2"):
+            self.assertIn(field,info)
+        self.assertEqual(run(self.out,'--restore','--from-iso',self.p)[0],0)
+        self.assertEqual(rd(self.out),self.original)
+
+    def test_custom_options_list_every_way_to_play(self):
+        # (pairs, dualshocks) -> [(players, pairs, whole, shared), ...]
+        self.assertEqual(bb_patch.custom_options(0, 3), [(3, 0, 3, 0), (4, 0, 2, 1), (5, 0, 1, 2), (6, 0, 0, 3)])
+        self.assertEqual(bb_patch.custom_options(1, 3), [(5, 1, 3, 0), (6, 1, 2, 1), (7, 1, 1, 2), (8, 1, 0, 3)])
+        self.assertEqual(bb_patch.custom_options(2, 0), [(4, 2, 0, 0)])
+        self.assertEqual(bb_patch.custom_options(0, 4), [(4, 0, 4, 0), (5, 0, 3, 1), (6, 0, 2, 2), (7, 0, 1, 3), (8, 0, 0, 4)])
+        self.assertEqual(bb_patch.custom_options(0, 8), [(8, 0, 8, 0)])
+        self.assertEqual(bb_patch.custom_options(2, 8), [(8, 2, 4, 0)])
+        for pairs in range(3):
+            for ds in range(9):
+                for players, p, w, s in bb_patch.custom_options(pairs, ds):
+                    self.assertEqual(players, 2 * p + w + 2 * s)
+                    self.assertTrue(1 <= players <= 8 and s <= 4 and w >= 0)
+
+    def test_custom_wizard_shows_defaults_and_refuses_too_few_controllers_without_writes(self):
+        prompts = []
+        answers = iter(['0', '0'])
+
+        def fake_input(prompt=''):
+            prompts.append(prompt)
+            return next(answers)
+        with unittest.mock.patch('builtins.input', fake_input), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(bb_patch.PatchError) as raised:
+                bb_patch.ask_custom()
+        self.assertEqual([p.split('[')[-1] for p in prompts], ['default: 0]: ', 'default: 4]: '])
+        self.assertIn('at least one pair of Buzz! buzzers or one DualShock', str(raised.exception))
+        answers = iter(['1', '3', '2'])
+        prompts.clear()
+        with unittest.mock.patch('builtins.input', fake_input), contextlib.redirect_stdout(io.StringIO()) as out:
+            self.assertEqual(bb_patch.ask_custom(), (1, 2, 1))
+        self.assertEqual([p.split('[')[-1] for p in prompts], ['default: 0]: ', 'default: 2]: ', 'default: 1]: '])
+        self.assertIn('You can play with:', out.getvalue())
+        self.assertIn('6 players: 1 pair of Buzz! buzzers + 2 DualShocks, one player each + 1 DualShock shared', out.getvalue())
+        rc, so, se = run(self.p, input_text=['6', '0', '0'])
+        self.assertEqual(rc, 1, so + se)
+        self.assertIn('at least one pair of Buzz! buzzers or one DualShock', se)
+        self.assertEqual(os.listdir(self.tmp), ['Game.iso'])
+        self.assertEqual(rd(self.p), self.original)
+
+    def test_custom_cli_all_examples_and_rejections(self):
+        examples = ((0,4,0),(0,0,2),(0,2,1),(1,2,0),(1,0,1),(1,6,0),(1,4,1),(1,2,2),
+                    (1,0,3),(2,0,0),(2,4,0),(2,0,2),(0,4,2),(0,0,4),(0,8,0),(2,2,1))
+        for p,w,s in examples:
+            target = os.path.join(self.tmp,'custom_%d_%d_%d.iso' % (p,w,s))
+            flags = ('--buzzer-pairs',str(p),'--whole-ds',str(w),'--shared-ds',str(s))
+            rc,so,se = run(self.p,'--out',target,*flags,'--poll','off','--attach-delay-ms','250','--heartbeat-ms','40')
+            self.assertEqual(rc,0,so+se)
+            blob = rd(target)[self.meta['usbd_lba']*SECTOR:]
+            cfg = bb_patch.read_config(blob)
+            self.assertEqual(cfg,dict(version=1,layout=13,flags=0x11,attach_delay_ms=250,heartbeat_ms=40,
+                                      buzzer_pairs=p,whole_ds=w,shared_ds=s,players=2*p+w+2*s,
+                                      dongles=1 if 2*p+w+2*s <= 4 else 2))
+            self.assertEqual(blob[blob.index(bb_patch.CFG_MAGIC)+11],p+3*w+27*s)
+            self.assertNotIn('What do you have?',so)
+        rejected = os.path.join(self.tmp,'refused.iso')
+        for flags,code,fragment in (
+            (('--buzzer-pairs','1','--whole-ds','8'),1,'maximum 8'),
+            (('--whole-ds','0'),1,'between 1 and 8'),
+            (('--whole-ds','-1'),1,'0-8'),
+            (('--buzzer-pairs','3'),1,'0-2'),
+            (('--shared-ds','5'),1,'0-4'),
+            (('--whole-ds','nine'),2,'invalid int value'),
+            (('--whole-ds','4','--layout','0'),2,'cannot be combined with --layout'),
+            (('--whole-ds','4','--layout','custom'),2,'cannot be combined with --layout'),
+            (('--layout','custom'),1,'custom needs'),
+            (('--whole-ds','4','--diag-tap'),1,'including custom')):
+            rc,so,se = run(self.p,'--out',rejected,*flags)
+            self.assertEqual(rc,code,so+se)
+            self.assertIn(fragment,se)
+            for suffix in ('','.bbpatch.json','.usbd.orig'):
+                self.assertFalse(os.path.exists(rejected+suffix))
+        self.assertEqual(rd(self.p),self.original)
 
     def test_info_writes_nothing_and_reports_patched_config(self):
         before = sorted(os.listdir(self.tmp))

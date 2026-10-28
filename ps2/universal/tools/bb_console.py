@@ -122,17 +122,40 @@ class Console:
         if layout >= 5:
             self.line('DualShock buttons (one player per controller, either half works):')
             self.table('Left half', 'Right half', SHARED)
-            self.line('PCSX2: tick its built-in multitap setting (Settings > Controllers > Global Settings > Multitap on Console Port 1/2); no physical multitap needed.')
-            if layout < 9:
-                self.line('PS3: CONFIG needed unless controllers happen to land on the required fixed slots.')
         elif layout != 0:
             self.line('DualShock buttons' + (' (port 2, players 3-4):' if layout == 1 else ':'))
             self.table('Left half', 'Right half', SHARED)
 
-    def table(self, left, right, rows):
-        self.line('  %-12s %-18s %s' % ('Buzz! button', left, right))
+    def custom_setup(self, pairs, whole, shared):
+        # The wizard summary is also useful when stdin/stdout are redirected.
+        def show(text=''):
+            print(text, file=self.stream, flush=True)
+        show('Total: %d players' % (2 * pairs + whole + 2 * shared))
+        show('  %-24s %8s %8s' % ('Who uses what', 'Pads', 'Players'))
+        for label, pads, players in (('Buzz! buzzer pairs', pairs, 2*pairs),
+                                     ('Whole DualShocks', whole, whole),
+                                     ('Shared DualShocks', shared, 2*shared)):
+            show('  %-24s %8d %8d' % (label, pads, players))
+        show('Present pads, in slot order: buzzer pairs first, then whole DualShocks, then shared DualShocks.')
+        if pairs:
+            show('Connect buzzers before launch in the lowest occupied slot(s).')
+        show('Handsets stay assigned; a missing pad releases its handset(s) after about 3 seconds.')
+        if pairs:
+            show('Buzz! buzzer pair buttons:')
+            self.table('Handset 1', 'Handset 2', BUZZERS, always=True)
+        if whole:
+            show('Whole DualShock buttons: either half controls the same player.')
+            show('Select, Start, L3 and R3 also buzz red.')
+            self.table('Left half', 'Right half', SHARED, always=True)
+        if shared:
+            show('Shared DualShock buttons: LEFT half = one player; RIGHT half = another.')
+            self.table('Left player', 'Right player', SHARED, always=True)
+
+    def table(self, left, right, rows, always=False):
+        line = (lambda text: print(text, file=self.stream, flush=True)) if always else self.line
+        line('  %-12s %-18s %s' % ('Buzz! button', left, right))
         for button, colour, (a, b) in zip(BUTTONS, COLOURS, rows):
-            self.line('  %s %-18s %s' % (self.paint('%-12s' % button, colour), a, b))
+            line('  %s %-18s %s' % (self.paint('%-12s' % button, colour), a, b))
 
     def error(self, error, hint):
         self.end_step()

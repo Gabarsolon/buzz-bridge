@@ -41,7 +41,8 @@ static const char *const layout_names[] = {
 
 const char *bb_layout_name(unsigned id)
 {
-    return id < BB_LAYOUT_COUNT ? layout_names[id] : "?";
+    return id >= 256 && id <= 390 ? "custom" :
+           id < BB_LAYOUT_COUNT ? layout_names[id] : "?";
 }
 
 /* netemu turns the Buzz! dongle into one DualShock; this is its (hardware confirmed) mapping. */
@@ -66,10 +67,24 @@ int bb_layout_build(unsigned id, bb_layout_t *out)
 
     out->ndongles = 1;
     out->any_slots = 0;
+    out->custom = out->pairs = out->whole = out->shared = 0;
     for (h = 0; h < BB_ALL_HANDSETS; h++) {
         out->h[h].src = BB_NOSRC;
         for (i = 0; i < BZ_COUNT; i++)
             out->h[h].mask[i] = 0;
+    }
+    if (id >= 256 && id <= 390) {
+        unsigned packed = id - 256;
+        unsigned p = packed % 3, w = (packed / 3) % 9, s = packed / 27;
+        unsigned players = 2 * p + w + 2 * s;
+        if (players < 1 || players > BB_ALL_HANDSETS)
+            return -1;
+        out->custom = out->any_slots = 1;
+        out->pairs = p;
+        out->whole = w;
+        out->shared = s;
+        out->ndongles = players > BB_HANDSETS ? 2 : 1;
+        return 0;
     }
     switch (id) {
     case BB_LAYOUT_buzzers:
@@ -141,6 +156,53 @@ void bb_assign_init(bb_assign_t *a)
     }
 }
 
+/* Custom roles have contiguous handset spans, including a pair crossing the
+ * dongle boundary. owner[] stores the span's first handset, just as IDs 9-12.
+ * Only role starts participate in allocation; each pair is one reservation. */
+static void assign_custom(bb_assign_t *a, bb_layout_t *lay, unsigned present, uint32_t ms)
+{
+    unsigned s, r, h, used = 0;
+    unsigned roles = lay->pairs + lay->whole + lay->shared;
+    for (s = 0; s < BB_NSRC; s++) {
+        if (present & (1u << s))
+            a->seen[s] = ms;
+        else if ((uint32_t)(ms - a->seen[s]) >= BB_ASSIGN_TIMEOUT_MS)
+            a->owner[s] = BB_NOSRC;
+        if (a->owner[s] != BB_NOSRC)
+            used |= 1u << a->owner[s];
+    }
+    for (s = 0; s < BB_NSRC; s++) {
+        if (!(present & (1u << s)) || a->owner[s] != BB_NOSRC)
+            continue;
+        for (r = 0, h = 0; r < roles; r++) {
+            if (!(used & (1u << h)))
+                break;
+            h += r < lay->pairs || r >= lay->pairs + lay->whole ? 2 : 1;
+        }
+        if (r == roles)
+            continue;
+        a->owner[s] = (uint8_t)h;
+        used |= 1u << h;
+    }
+    for (h = 0; h < BB_ALL_HANDSETS; h++)
+        lay->h[h].src = BB_NOSRC;
+    for (s = 0; s < BB_NSRC; s++) {
+        h = a->owner[s];
+        if (h == BB_NOSRC)
+            continue;
+        if (h < 2u * lay->pairs) {
+            bind(&lay->h[h], s, netemu_h1, 0);
+            bind(&lay->h[h + 1], s, netemu_h2, 0);
+        } else if (h < 2u * lay->pairs + lay->whole) {
+            bind(&lay->h[h], s, half_left, half_right);
+            lay->h[h].mask[BZ_RED] |= PADB_SELECT | PADB_START | PADB_L3 | PADB_R3;
+        } else {
+            bind(&lay->h[h], s, half_left, 0);
+            bind(&lay->h[h + 1], s, half_right, 0);
+        }
+    }
+}
+
 void bb_assign_update(bb_assign_t *a, bb_layout_t *lay, unsigned id,
                       unsigned present, uint32_t ms)
 {
@@ -149,6 +211,10 @@ void bb_assign_update(bb_assign_t *a, bb_layout_t *lay, unsigned id,
                      id == BB_LAYOUT_any_2buzzers_ds ? 2 : 0;
     if (!lay->any_slots)
         return;
+    if (lay->custom) {
+        assign_custom(a, lay, present, ms);
+        return;
+    }
     /* Expire only the missing owner. Never compact surviving assignments. */
     for (s = 0; s < BB_NSRC; s++) {
         if (present & (1u << s))

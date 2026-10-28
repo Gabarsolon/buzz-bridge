@@ -53,6 +53,7 @@ static volatile u8 tap_stage[BB_NSRC]; /* 0 no detect, 1 select refused, 2 empty
 static u8 diag_slot[BB_PORTS];
 static unsigned diag_tap;
 static unsigned any_slots;
+static unsigned custom_slots, restore_blocked; /* custom only: isolate a port with an unconfirmed restore */
 static volatile u32 scan_snap[BB_NSRC]; /* publish one complete ordered scan, never a partial A/B batch */
 static unsigned tap_selected_mask; /* include attempted selections whose acknowledgement may be lost */
 
@@ -294,7 +295,7 @@ static void tap_detect(unsigned flags)
 
     bb_td_reset(&btd);
     for (p = 0; p < BB_PORTS; p++)
-        if (tap_wanted[p] && !tap_slots[p])
+        if (tap_wanted[p] && !tap_slots[p] && !(restore_blocked & (1u << p)))
             bb_td_add_tap_detect(&btd, p);
     if (!btd.n)
         return;
@@ -321,7 +322,8 @@ static unsigned tap_select(unsigned slot)
 
     bb_td_reset(&btd);
     for (p = 0; p < BB_PORTS; p++)
-        if (tap_slots[p] && (tap_wanted[p] & (1u << slot)) && slot < tap_slots[p]) {
+        if (tap_slots[p] && (tap_wanted[p] & (1u << slot)) && slot < tap_slots[p] &&
+            !(restore_blocked & (1u << p))) {
             bb_td_add_tap_select(&btd, p, slot);
             tap_selected_mask |= 1u << p;
         }
@@ -395,10 +397,15 @@ static void poll_session(unsigned flags, int need_a, int need_tap_cycle, int nee
     real_begin();
     if (tap_selected_mask) /* a previous restore failed: never label a non-A read as A */
         tap_restore(flags);
-    if (tap_selected_mask) {
+    restore_blocked = custom_slots ? tap_selected_mask : 0;
+    if (tap_selected_mask && !custom_slots) {
         real_end();
         return;
     }
+    /* A netemu port can stop acknowledging restores after its last B-D pad
+     * disappears. Keep retrying that port without blocking scans of the other
+     * port or stale-snapshot publication. Never read the blocked port as A.
+     * Legacy layouts retain their original session/restore behavior. */
     if (need_detect && any_slots)
         tap_detect(flags);
     if (need_a || (any_slots && need_tap_cycle)) {
@@ -406,7 +413,8 @@ static void poll_session(unsigned flags, int need_a, int need_tap_cycle, int nee
         for (p = 0; p < BB_PORTS; p++)
             /* A PADMAN read can supply A, but traffic on port 1 must never
              * suppress discovering an idle/new pad on port 2. */
-            if (need_a || age[BB_SRC(p, 0)] >= 8 || !(snap[BB_SRC(p, 0)] & 0x80000000u))
+            if (!(restore_blocked & (1u << p)) &&
+                (need_a || age[BB_SRC(p, 0)] >= 8 || !(snap[BB_SRC(p, 0)] & 0x80000000u)))
                 bb_td_add_pad_read(&btd, p);
         if (btd.n && !((send_td() >> 13) & 1))
             take_reads(0);
@@ -435,6 +443,8 @@ void bbpad_configure(unsigned layout_id, unsigned flags)
         bb_layout_build(BB_LAYOUT_buzzers, &lay);
     bb_layout_taps(&lay, tap_wanted);
     any_slots = lay.any_slots;
+    custom_slots = lay.custom;
+    restore_blocked = 0;
     /* The CLI refuses this combination; never synthesize onto unknown bindings. */
     diag_tap = any_slots ? 0 : flags & BB_FLAG_DIAG_TAP;
     for (p = 0; p < BB_PORTS; p++) {

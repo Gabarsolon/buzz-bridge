@@ -75,25 +75,33 @@ Restoration refuses wrong checksums, changed extents and unrelated USBD edits. R
 
 ## Setups and controller buttons
 
-Menu choices are **1-9**. Command-line layout IDs are **0-12** (IDs 5-8 are older fixed-slot multitap setups that are not in the menu):
+Menu choices are **1-6**. Entries 1-5 retain their original mappings. Entry 6 asks three numbers:
 
-| Menu | CLI ID / name | Controller port 1 | Controller port 2 | Players |
-|---|---|---|---|---|
-| 1. Buzz! buzzers only | `0` / `buzzers` | PS3-mapped wired dongle: handsets 1-2 | Unused | 2 |
-| 2. Buzz! buzzers + 1 DualShock | `1` / `buzzers_ds` | PS3-mapped wired dongle: handsets 1-2 | Split: players 3-4 | 4 |
-| 3. 2 DualShocks, shared | `2` / `two_ds_shared` | Split: players 1-2 | Split: players 3-4 | 4 |
-| 4. 2 DualShocks, one player each | `3` / `two_ds_single` | Whole controller: player 1 | Whole controller: player 2 | 2 |
-| 5. 1 DualShock, shared | `4` / `one_ds_shared` | Split: players 1-2 | Unused | 2 |
-| 6. Buzz! buzzers + 2 DualShocks (any slots) | `9` / `any_buzzers_ds` | Both ports scanned; lowest occupied slot = buzzer handsets 1-2 | Up to 2 whole DualShocks on any other slots = handsets 3-4 | 4 |
-| 7. 4 DualShocks (any slots) | `10` / `any_ds4` | Both ports scanned | Up to 4 whole DualShocks on any slots | 4 |
-| 8. 2 pairs of Buzz! buzzers + 4 DualShocks (any slots) | `11` / `any_2buzzers_ds` | Lowest 2 occupied slots = buzzer pads A/B, handsets 1-2 / 5-6 | Up to 4 whole DualShocks on other slots = handsets 3,4,7,8 | 8 |
-| 9. 8 DualShocks (any slots) | `12` / `any_ds8` | Both ports scanned | Up to 8 whole DualShocks on any slots; two virtual dongles | 8 |
+| Menu | Setup | Players |
+|---|---|---|
+| 1 | Buzz! buzzers only | 2 |
+| 2 | Buzz! buzzers + 1 DualShock | 4 |
+| 3 | 2 DualShocks, shared | 4 |
+| 4 | 2 DualShocks, one player each | 2 |
+| 5 | 1 DualShock, shared | 2 |
+| 6 | More than 2 controllers (any slots) | 1-8 |
 
-**Setups 6-9 (more than 2 controllers):** no physical multitap is needed. The patch uses the built-in multitap of the PS3's PS2 emulator or of PCSX2. Each DualShock is one whole player (either half of the controller works, buttons as in the table below) and it can sit on any slot of any multitap, so nothing needs to be configured. On a PS3, put each controller on a slot with the PS button as usual; the bridge reads all slots. In PCSX2, tick its built-in multitap setting, **Settings > Controllers > Global Settings > Multitap on Console Port 1/2**, and set the slots (Controller Port 1A-1D / 2A-2D) to DualShock 2. Eight players need a game with two-buzzer-set support: the quiz games (Big, Sports, Mega, Hollywood, Pop, Schools Quiz, Brain of...), not Buzz! Junior or The Music Quiz (4 players).
+For entry 6 the patcher asks how many **pairs of Buzz! buzzers** (0-2) and how many **DualShocks** you have (each question shows its default), then lists every way you can play with them and you pick one. Every DualShock you share (left half = one player, right half = another) adds one player, up to 8. For example, with 1 pair of buzzers and 3 DualShocks you can play with 5, 6, 7 or 8 players. The tool then shows a summary and the button tables.
 
-**Multitap assignment:** a valid idle pad counts as present. On each complete scan, new pads are considered in order 1-A, 1-B, 1-C, 1-D, 2-A, 2-B, 2-C, 2-D. There is no reliable Buzz-pad identifier in the normal pad replies: for setup 6 the first pad gets the buzzer role; for setup 8 the first two do. **Connect the buzzer pads before launch and keep them in the lowest occupied slot(s).** Their two mapped handsets become 1–2 and, for the second pair, 5–6. Handsets 3 and 4 of each physical dongle remain unavailable through netemu's pad mapping.
+No extra hardware is needed: the patch reads the emulator's controller slots. On PS3, assign controllers with the PS button as usual. In PCSX2, enable its built-in multitap setting under **Settings > Controllers > Global Settings** for the console ports you use, then set their A-D slots to DualShock 2. More than four players need a game that uses two buzzer sets, such as Schools Quiz; the Junior games and The Music Quiz have four-player limits.
 
-Each discovered pad keeps its handset(s). A missing pad stops sending buttons immediately and reserves its assignment for about 3 seconds; returning inside that time keeps the assignment. Other players never move. After the timeout a waiting extra pad can take the free assignment; reconnect a buzzer before other new pads if its reservation expired. Excess pads are ignored. Game seat order follows who presses blue first, independently of handset numbers. Select, Start, L3 and R3 also buzz red on whole DualShocks in setups 6–9; the usual two halves supply the five colours.
+The command-line equivalent uses counts with **no `--layout`**; omitted counts default to zero:
+
+```powershell
+python buzz_bridge_ps2.py "My Game.iso" --buzzer-pairs 1 --whole-ds 2 --shared-ds 1
+python buzz_bridge_ps2.py "My Game.iso" --shared-ds 2
+```
+
+This selects layout **13 / `custom`**. `--info` reports all three counts, total players and dongle count. One virtual dongle serves up to four players; two serve five to eight, filling handsets 1-4 before 5-8. Polling defaults to auto and is forced on if `--poll off` was supplied. `--diag-tap` is CLI-only for fixed layouts 5-8 and is refused for custom setups. IDs 0-12 retain their old behavior; 5-12 remain available through `--layout` for compatibility and are absent from the menu. IDs 0-4 correspond to menu choices 1-5.
+
+A valid idle pad counts as present. On each complete scan new pads are considered in order **1-A, 1-B, 1-C, 1-D, 2-A, 2-B, 2-C, 2-D**. The first P take buzzer roles, the next W are whole DualShocks, and the next S are shared DualShocks; extra pads are ignored. There is no reliable Buzz-pad identifier in ordinary replies. **Connect buzzer pads before launch in the lowest occupied slots, followed by whole pads and then shared pads.** Each buzzer pad takes two handsets, each whole pad one, each shared pad two; assignments fill consecutively. Only the first two physical handsets of each real Buzz! dongle reach netemu's pad mapping.
+
+Each discovered pad keeps its handset(s). A missing pad stops sending buttons immediately and reserves its assignment for about 3 seconds; returning inside that time keeps the assignment. Other players never move. After timeout a new or waiting pad can take the freed role; reconnect a buzzer before other new pads if its reservation expired. Game seat order follows who presses blue first, independently of handset numbers. Select, Start, L3 and R3 also buzz red on whole DualShocks in custom and legacy any-slot setups. Shared pads retain the independent half mappings below.
 
 **Shared DualShock:** the left half belongs to the first player on that port, the right half to the second. Shapes below refer to the buttons printed on the controller:
 
@@ -117,7 +125,7 @@ For `two_ds_single`, each player can use either half of their own controller: bo
 | Green | ○ Circle | R2 |
 | Yellow | × Cross | L2 |
 
-Layouts 0, 1, 5, 7, 9 and 11 are intended for the PS3 mapping; universal-module PS3 testing is still pending. On PCSX2, use a DualShock layout for ordinary controllers.
+Layouts with buzzer pairs use the PS3 mapping. The user confirmed legacy layout 9 on a real PS3 CFW with real buzzers, a DS3 and a DualSense; custom mixes still need hardware validation. On PCSX2, use a DualShock layout for ordinary controllers.
 
 ## PCSX2
 

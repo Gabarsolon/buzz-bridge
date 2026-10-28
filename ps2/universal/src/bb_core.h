@@ -59,6 +59,7 @@ typedef struct {
     bb_bind_t h[BB_ALL_HANDSETS]; /* handsets 0-3 = dongle 1, 4-7 = dongle 2 */
     uint8_t ndongles;             /* 1 or 2 virtual dongles */
     uint8_t any_slots;            /* scan both ports, even before any bindings exist */
+    uint8_t custom, pairs, whole, shared; /* only used by layout 13 */
 } bb_layout_t;
 
 enum {
@@ -69,11 +70,14 @@ enum {
 };
 
 /* Fills out for layout id. Returns 0, or -1 for an unknown id (out = all unbound). */
+/* Runtime-only IDs tag the spare config byte with bit 8. Never stored in
+ * the on-disk layout byte. A bare custom ID has no counts and is rejected. */
+#define BB_CUSTOM_ID(p, w, s) (256u + (p) + 3u * (w) + 27u * (s))
 int bb_layout_build(unsigned id, bb_layout_t *out);
 const char *bb_layout_name(unsigned id);
 
 /* Sticky ownership, measured in milliseconds with unsigned wrap-safe subtraction.
- * No wire discriminator exists: allocate buzzer roles first, then whole pads.
+ * No wire discriminator exists: allocate buzzer roles first, then whole pads, then shared pads (custom).
  * Call once per complete scan, in port-major source order. */
 #define BB_ASSIGN_TIMEOUT_MS 3000u
 typedef struct {
@@ -171,7 +175,9 @@ typedef struct {
     uint8_t version;       /* 1 */
     uint8_t layout;        /* BB_LAYOUT_* */
     uint8_t flags;         /* BB_FLAG_* */
-    uint8_t reserved;
+    uint8_t reserved;      /* layout 13 only: P + 3*W + 27*S, P<=2 W<=8 S<=4;
+                           * require 1 <= 2*P+W+2*S <= 8. Ignored for IDs 0-12.
+                           * Version, magic, timings and 16-byte size unchanged. */
     uint16_t attach_delay_ms;
     uint16_t heartbeat_ms;
 } bb_cfg_t;
