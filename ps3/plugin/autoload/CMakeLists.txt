@@ -20,8 +20,13 @@ add_custom_command(TARGET ps3buzz_vsh POST_BUILD
  COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_SOURCE_DIR}/../tools/sign_native_self.py"
  "${BUZZ_ROOT}/build/ps3buzz_vsh.prx" "${BUZZ_ROOT}/build/ps3buzz_vsh.sprx" --vsh
  VERBATIM)
-add_executable(BuzzBridge app.c app_ui.c logic.c files.c)
+option(BB_BUNDLED_NETEMU "Include bundled finished netemu support" OFF)
+add_executable(BuzzBridge app.c app_ui.c app_health.c ui_layout.c logic.c files.c menu.c bb_dir.c bb.c bb_io.c
+ iso_patch.c netemu_installer.c netemu_platform.c)
+if(BB_BUNDLED_NETEMU)
+ target_compile_definitions(BuzzBridge PRIVATE BB_BUNDLED_NETEMU=1)
+endif()
 target_compile_features(BuzzBridge PRIVATE c_std_11)
 target_compile_options(BuzzBridge PRIVATE -O2 -Wall -Wextra -Werror -Wno-misleading-indentation)
-target_link_libraries(BuzzBridge PRIVATE rsx gcm_cmd gcm_sys dbgfont io sysutil netctl sysmodule_stub rt lv2)
+target_link_libraries(BuzzBridge PRIVATE rsx gcm_cmd gcm_sys io sysutil net netctl sysmodule_stub rt lv2)
 ps3_add_self(BuzzBridge OUTPUT_DIRECTORY "${BUZZ_ROOT}/build/app")

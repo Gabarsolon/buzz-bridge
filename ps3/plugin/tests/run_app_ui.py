@@ -6,11 +6,13 @@ env=os.environ.copy();env.update(TEMP=str(ROOT/'build/tmp'),TMP=str(ROOT/'build/
 compiler='C:/Program Files/LLVM/bin/clang.exe'
 commands=[[compiler,'-std=c11','-O2','-Wall','-Wextra','-Werror','-Wno-misleading-indentation',
  '-D_CRT_SECURE_NO_WARNINGS','-DBUZZ_APP_HOST_TEST=1','-Iplugin/tests',
- 'plugin/autoload/app_ui.c','plugin/tests/test_app_ui.c','-o',str(OUT/'test_app_ui.exe')]]
-scenarios=['yes','no','cancel','quit','system_menu','timeout','status_timeout','dialog_fail','flip_timeout','late_label_timeout',
+ 'plugin/autoload/app_ui.c','plugin/autoload/app_health.c','plugin/autoload/ui_layout.c','plugin/tests/test_app_ui.c','-o',str(OUT/'test_app_ui.exe')]]
+scenarios=['work_stable','idle_stable','menu_select','menu_select_noinfo','menu_idle_exit','idle_exit','menu_cancel','menu_timeout','yes','no','cancel','quit','system_menu','timeout','status_timeout','late_answer','long_ps_menu','long_dialog','flip_timeout','late_label_timeout',
  'thread_fail','log_open_fail','log_sync_fail','host_alloc_fail','callback_register_fail','callback_fail',
- 'gcm_fail','rsx_alloc_fail','configure_fail','video_state_timeout','font_fail','font_draw_fail','pad_fail',
- 'flip_submit_fail','label_timeout','watchdog','total_watchdog']
+ 'gcm_fail','rsx_alloc_fail','configure_fail','video_state_timeout','display_buffer_fail','pad_fail',
+ 'flip_submit_fail','label_timeout','watchdog','total_watchdog',
+ 'query_fallback','bad_resolution','resume_change','refresh_query_fail']
+scenarios += ['video_'+mode+'_'+aspect for mode in ('480i','480p','576i','576p','720p','1080i','1080p') for aspect in ('4_3','16_9')]
 commands += [[str(OUT/'test_app_ui.exe'),s] for s in scenarios]
 results=[]
 for cmd in commands:

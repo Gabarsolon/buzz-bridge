@@ -1,3 +1,11 @@
+> Workspace update, 2026-10-30: the app sources are in `plugin/autoload/`,
+> with the new menu, local SELF builder/installer and in-place ISO patcher.
+> See the workspace `REPORT.md` and `ps3/README.md` for the current behavior,
+> build command, byte-equality checks, publication boundary and console steps.
+> New screens, builder/install integration and PS3 ISO patching are NOT console
+> tested. S4E7/S4L3 console verification is pending. The older notes below
+> describe the retained phone/game plugin and its previous evidence.
+
 # PS3 virtual Buzz! — current build entry
 
 The app is Buzz! Bridge (`BUZZB0001`, `BuzzBridge.pkg`), with fsynced `/dev_hdd0/tmp/buzzbridge_app.log`. **CFW/Cobra and PS3HEN (HEN untested); signing rev 0A.** Runtime 0.9 / helper 0.3 retain the released PRX payloads byte-for-byte, with a 15-second helper settle and 10-second runtime minimum. Wait at the game's menu for about **30 seconds**. The user reports previous rev-1 CFW success with Quiz TV autoload and manual Brain of the UK/Quiz World loads; the new signing needs CFW retesting before HEN testing. Reboot before each title; the helper parks after its first attempt. See [the user guide](../README.md) and [signing research, proof and handoff](../build/HEN_SIGNING.md). The old package is `build/BuzzBridge_rev1.pkg`.

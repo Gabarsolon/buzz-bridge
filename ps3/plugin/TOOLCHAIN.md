@@ -1,4 +1,12 @@
-# Current self-contained build
+> Workspace update, 2026-10-30: the app sources are in `plugin/autoload/`,
+> with the new menu, local SELF builder/installer and in-place ISO patcher.
+> See the workspace `REPORT.md` and `ps3/README.md` for the current behavior,
+> build command, byte-equality checks, publication boundary and console steps.
+> New screens, builder/install integration and PS3 ISO patching are NOT console
+> tested. S4E7/S4L3 console verification is pending. The older notes below
+> describe the retained phone/game plugin and its previous evidence.
+
+# Historical build notes (superseded in this workspace)
 
 Run root `build_ps3.ps1` with the installed read-only PS3DK v0.26.0. It rebuilds the game, requires identical decrypted PRX versus the confirmed 0.7, restores the confirmed distribution bytes, builds the new helper/app, and packages/audits `build/BuzzPhones.pkg`. All source inputs and temporary output are inside this folder; no original game ELF or scratchpad is read. Public signing text is under `research/load10/`. Frozen digests are in `plugin/autoload/frozen_inputs.json`; `make_profile.py` verifies them instead of regenerating from game data. No pip packages were installed.
 

@@ -6,6 +6,13 @@
 #define CELL_MSGDIALOG_BUTTON_ESCAPE -1
 #define CELL_MSGDIALOG_BUTTON_YES 1
 #define CELL_MSGDIALOG_BUTTON_NO 2
+#define CELL_MSGDIALOG_BUTTON_OK 1
+#define VIDEO_STATE_BUSY 3
+#define VIDEO_RESOLUTION_720 2
+#define VIDEO_ASPECT_4_3 1
+#define VIDEO_ASPECT_16_9 2
+#define VIDEO_SCANMODE_INTERLACE 0
+#define VIDEO_SCANMODE_PROGRESSIVE 1
 #define CELL_MSGDIALOG_TYPE_SE_TYPE_NORMAL 0
 #define CELL_MSGDIALOG_TYPE_BG_VISIBLE 0
 #define CELL_MSGDIALOG_TYPE_BUTTON_TYPE_YESNO 1
@@ -47,11 +54,13 @@ typedef struct {
  int colorFormat,colorTarget,colorLocation[4],depthFormat,depthLocation,type,antiAlias;
  uint32_t colorOffset[4],colorPitch[4],depthOffset,depthPitch,width,height;
 } CellGcmSurface;
-typedef struct {unsigned state;struct {unsigned resolution,aspect;} displayMode;} videoState;
+typedef struct {unsigned state;struct {unsigned resolution,aspect,scanMode;} displayMode;} videoState;
 typedef struct {uint16_t width,height;} videoResolution;
 typedef struct {unsigned resolution,format,pitch,aspect;} videoConfiguration;
 typedef struct {sys_addr_t localBufAddr;uint32_t localBufSize,option;uint16_t screenWidth,screenHeight;} CellDbgFontConfigGcm;
-typedef struct {int len,BTN_START,BTN_CIRCLE,BTN_CROSS;} padData;
+typedef struct {int len,BTN_START,BTN_CIRCLE,BTN_CROSS,BTN_UP,BTN_DOWN,BTN_LEFT,BTN_RIGHT;} padData;
+typedef struct {unsigned connected;unsigned char status[8];} padInfo;
+int ioPadGetInfo(padInfo *);
 uint64_t sys_time_get_system_time(void);
 void sys_timer_usleep(unsigned);
 void usleep(unsigned);

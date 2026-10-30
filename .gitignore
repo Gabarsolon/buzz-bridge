@@ -38,3 +38,6 @@ ps3/console_backup/
 *.prx
 *.pkg
 *.elf
+*.self
+*.bnp
+local_only/

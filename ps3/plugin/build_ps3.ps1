@@ -11,7 +11,7 @@ try {
   $env:TEMP = Join-Path $PWD 'build\tmp'; $env:TMP = $env:TEMP
   $env:PYTHONDONTWRITEBYTECODE = '1'
   New-Item -ItemType Directory -Force -Path build/tmp | Out-Null
-  python -B plugin/tools/build_autoload.py
+  python -B ../tools/build_package.py --sdk $Sdk
   if ($LASTEXITCODE) { throw 'Native build/package verification failed' }
 } finally {
   foreach ($key in $saved.Keys) { [Environment]::SetEnvironmentVariable($key,$saved[$key],'Process') }

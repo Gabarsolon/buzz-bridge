@@ -1,3 +1,11 @@
+> Workspace update, 2026-10-30: the app sources are in `plugin/autoload/`,
+> with the new menu, local SELF builder/installer and in-place ISO patcher.
+> See the workspace `REPORT.md` and `ps3/README.md` for the current behavior,
+> build command, byte-equality checks, publication boundary and console steps.
+> New screens, builder/install integration and PS3 ISO patching are NOT console
+> tested. S4E7/S4L3 console verification is pending. The older notes below
+> describe the retained phone/game plugin and its previous evidence.
+
 # PS3 virtual Buzz: game-process adapter
 
 Updated 2026-10-26: the game-process SPRX is now cross-compiled and linked with the installed read-only PS3DK v0.26.0. Outputs are `build/ps3buzz.sprx`, `build/ps3buzz.fake.sprx`, `build/ps3buzz.prx` and config. Native PRX/relocation/sample checks and PC tests pass. **No PS3 load or console behavior has been tested in this run.** No console connection, screen/input automation, emulator launch, toolchain installation or game-file modification occurred. See [README.md](plugin/README.md) for the concrete first-console-test procedure and [TOOLCHAIN.md](plugin/TOOLCHAIN.md) for exact build commands.

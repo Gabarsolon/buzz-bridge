@@ -1,76 +1,179 @@
-# Buzz! Bridge (PS3)
+# Buzz! Bridge: PS3 app with three play routes
 
-Play **PS3 Buzz! games** with **phones** and **DualShock controllers** instead of Buzz! buzzers. No extra hardware and no game patching.
+This workspace adds a controller menu to the existing homebrew app. D-pad moves,
+Cross selects, Circle goes back. Every ISO or emulator replacement asks for an
+explicit confirmation. The owner has tested the ISO browser fix (all ISOs now
+appear), the 576i UI fix (flicker gone), and the finished modified
+`ps2_netemu.self` with four handsets and game lamps on a real console.
+The app's entry-2 write/restore/rollback integration remains PC-tested only.
+PC equality checks and the PS3DK package build are recorded in
+[REPORT.md](../REPORT.md#wording-fixes).
 
-A small plugin runs inside the game and presents up to **two virtual Buzz! buzzer sets (8 players)** to it. Phones join over Wi-Fi through a web page served by the PS3; DualShocks are read directly. The game sees ordinary wired buzzers, so its "no Buzz! buzzers detected" screen goes away.
+At the root, Circle is ignored. Choose **Exit to XMB** or use PS-button Quit
+Game to quit. Submenus, ISO folders, wizard steps, status pages and confirmations
+return to their preceding screen with Circle; it never confirms a write.
 
-## Status (PS3 v1.0.0)
+## 1. Phones and DualShock for PS3 Buzz! games
 
-| Game | Title ID | Tested on a PS3 |
-|---|---|---|
-| Buzz!: Brain of the UK | BCES00347 (01.00) | ✅ phones + DualShocks, full match |
-| Buzz!: Quiz TV – Special Edition | BCES00303 (01.00) | ✅ automatic start through the Buzz! Bridge app |
-| Buzz!: Quiz World | BCES00644 (01.00) | ✅ |
-| Other PS3 Buzz! versions | — | ❓ tried in "generic" mode, refused if anything does not match. See [PORTING.md](PORTING.md) |
+Select the first menu entry, then use the existing **Start for this session**,
+**Enable at boot**, or **Disable at boot** dialogs. Circle backs from Disable to
+Enable, then Start, then the root. Returning to entry 1 does not repeat the
+payload installation: it runs once per app launch, with the same safety-disable
+ordering. Yes at Start starts the helper, shows its result and exits to XMB.
+Completed boot edits also exit after their result; No at Disable leaves boot
+settings unchanged and exits. No at Start/Enable opens the next boot question.
+The signed game/helper payloads and default settings are byte-identical to the
+owner's `bridge_rev0a` copies. Session start does not change the boot list.
+Reboot before another game. Phones open `http://<PS3-IP>:8420/` during a supported
+game. R1/R2 = red, Triangle = blue, Square = orange, Circle = green, Cross = yellow.
 
-- **Console:** CFW with Cobra (tested: Evilnat 4.92 + webMAN MOD 1.47.48a). **PS3HEN: should work but is untested.** The plugin files are signed with key revision 0A, as HEN requires (same as webMAN MOD and DS45Pad). If you try it on HEN, please report the result with the logs listed below.
-- **Not yet tested on a PS3:** "Enable at boot". Use "Start for this session" until it is.
+The owner's prior console results remain: BCES00347 01.00 full match,
+BCES00303 01.00 automatic app start, and BCES00644. Enable at boot and HEN
+remain unproven. The recent browser and 576i UI fixes have owner console
+verification; entry-1 Circle/menu-flow changes have PC verification only.
 
-## Install
+## 2. Real Buzz! handsets in PS2 games, no ISO patching
 
-1. Download `BuzzBridge.pkg` from the [v1.2.1 release](../../../releases/tag/v1.2.1) and install it from the XMB (**Package Manager → Install Package Files**).
-2. Start **Buzz! Bridge** from the XMB and choose **Start for this session**. It installs its files to `/dev_hdd0/plugins/ps3buzz/`, starts a small background helper for this session only and shows the phone address. Nothing is added to the boot list.
-3. Start your Buzz! game (Buzz! buzzers unplugged) and wait at the main menu. After about **30 seconds** the helper loads the plugin into the game and the buzzers are detected.
-4. On phones on the same network open **`http://<PS3-IP>:8420/`** and pick a player. The game's buzzer lights show on the phone.
-5. **Reboot before playing another game.** The helper loads the plugin once per session.
+CFW only. The full `BuzzBridge.pkg` bundles one modified `ps2_netemu.self`
+(four handsets + lamps) and `ps2_netemu_original.self` (Evilnat 4.93 restore
+fallback). The modified file is owner-tested and stable on a real console.
+There is one install action, **Install the modified ps2_netemu.self (four
+handsets + lamps)**, with no build chooser. The owner plans to publish the full
+package and the standalone `ps2_netemu.self` together in a GitHub release.
+`BuzzBridge-public.pkg` is the second variant: it contains no netemu files and
+offers STATUS and restoring user backups only. No separate patch-data
+provisioning is used. Nothing was published by this work.
 
-## DualShock buttons
+STATUS hashes `/dev_flash/ps2emu/ps2_netemu.self`: original Evilnat 4.93,
+**modified ps2_netemu (this build)**, **older modified build**, or unknown.
+All 45 historical allow-list hashes remain recognized, so earlier modified
+files can be upgraded or restored. Its backup list shows every saved file in
+pages, including invalid/partial backups, with individual full hashes.
 
-| Controller | Buzzer |
-|---|---|
-| R1 or R2 | Red |
-| △ | Blue |
-| □ | Orange |
-| ○ | Green |
-| ✕ | Yellow |
+INSTALL asks for confirmation, default No. Unknown current hashes need an extra
+OVERWRITE confirmation. An identical target is a no-op. Current bytes are saved
+to `/dev_hdd0/buzzbridge/netemu_backup/ps2_netemu_<hash8>_<UTC timestamp>_<serial>.self`
+using exclusive creation and verified by full SHA256 before any writable mount.
+Existing backups are never overwritten or deleted, even on errors.
 
-Pad 1 is player 1, pad 2 is player 2; phones take the free players. The mapping is in `/dev_hdd0/plugins/ps3buzz/ps3buzz.cfg` (`players_per_pad=2` splits a pad into two players: the left half uses L1/L2 and the D-pad). Starting the app again reinstalls the default config.
+RESTORE chooses the oldest timestamped backup whose verified hash is not one of
+our builds, including an unknown original from another firmware revision. It
+refuses a failed/incomplete directory scan. If none exists, the full build
+can restore the bundled original after a confirmation naming **Evilnat 4.93**.
+The public build has no fallback file. A separate list allows a specific user
+backup to be selected. Saved names carry hash8; every list/restore rehashes the
+file and rejects accidental damage that changes that prefix. The full selected
+hash is pinned across confirmation and transaction source validation.
 
-## Start automatically at boot (untested)
+Replacement keeps the established webMAN **127.0.0.1** `/dev_blind?1` / `?0`
+mount route and writes `/dev_blind/ps2emu/ps2_netemu.self` directly. It verifies
+SHA256 by reading back, and attempts unmount on every mount-attempt path.
+HEN or no writable path is refused. Any returned write/read-back/unmount failure
+attempts automatic verified rollback from the just-saved HDD backup. Persistent
+storage or mount failures are reported with the recovery path. Successful
+installation says "Done. You can start your PS2 game now." Restoring the bundled
+original says "Done. The original is back."
 
-Start **Buzz! Bridge**, answer **No** to "Start for this session", then **Yes** to "Enable at boot". The app adds exactly one line (`/dev_hdd0/plugins/ps3buzz/ps3buzz_vsh.sprx`) to `/dev_hdd0/boot_plugins.txt` and keeps a backup (`boot_plugins.txt.ps3buzz.bak`). To turn it off: **No**, **No**, **Yes** ("Disable at boot"). Only the game plugin's helper goes in the boot list, never `ps3buzz.sprx` itself.
+Modified netemu needs original, unpatched ISOs; never combine it with ISO
+patching. The previous bounded warning scan remains. A power cut or watchdog
+exit during blocked I/O cannot execute live rollback; the verified HDD backup
+remains for restore on the next app run or with a file manager. A bad
+netemu affects PS2 emulation; manual backup recovery or firmware reinstall may
+be needed. No in-app install/restore, writable-flash I/O, local mount/unmount,
+backup enumeration, HEN detection, or rollback has been verified on a console. The
+finished modified file's handset/lamp test does not verify those app operations.
+No live firmware failure injection was performed.
 
-## Safety and recovery
+## 3. Patch a PS2 ISO (CFW, original netemu)
 
-Nothing is written to dev_flash and no game file is changed. The plugin only lives in the running game; quitting the game removes it.
+CFW only, keeping original netemu, with plain `.iso` images through Cobra.
+Browse `/dev_hdd0/PS2ISO` or
+accessible `/dev_usb000` through `/dev_usb007` folders. Choose `/dev_hdd0` to
+browse other HDD folders. Each page contains up to 254 files/subfolders;
+Previous/Next page controls provide access to the rest. Entries are sorted
+within each page (pages follow filesystem enumeration order); keep the folder
+unchanged while paging. Eight subfolder levels are permitted. File sizes use
+64-bit metadata and are shown in binary MB/GB units before the name so even
+long names retain a visible size. A `?` means details could not be read; the
+entry remains selectable and its path/return code is logged to
+`/dev_hdd0/tmp/buzzbridge_app.log`. ISO contents are inspected only on selection. Only plain extracted
+2048-byte-sector `.iso` files are supported; USB format support depends on the
+console's filesystem driver. Detected volume and a root executable title ID are
+shown where available. Check only performs no writes.
 
-- **Skip the helper:** hold **R2** while the helper starts (the first 10 seconds after XMB start or after "Start for this session").
-- **`/dev_hdd0/plugins/ps3buzz/disable`**: while this file exists, the helper loads nothing.
-- **`/dev_hdd0/tmp/ps3buzz.stop`**: stops the helper and a running game plugin; reboot afterwards.
-- **XMB freezes at boot** (boot option): boot holding R2. If that is not enough, put an **empty** `boot_plugins.txt` in the root of a FAT32 USB stick that the PS3 sees as `dev_usb000` before boot (which port that is varies; not tested yet); Cobra reads it instead of the HDD list (this also skips webMAN for that boot), then disable the boot option in the app.
-- Logs for bug reports: `/dev_hdd0/tmp/buzzbridge_app.log`, `ps3buzz_vsh.log`, `ps3buzz.log`, `ps3buzz.heartbeat.log`.
+Recognised standalone USBD module families are Schools/Mega (1.3.0), Junior
+(1.4.0), and Monster Rumble (1.6.0), using the same three module fingerprints
+as the PC patcher. Recognition requires one unambiguous `/IOP/USBD.IRX` or
+`/SYSTEM/USBD.IRX` in a supported ISO layout; a title/filename alone does not
+establish compatibility. Embedded-only modules and other fingerprints remain
+unsupported. Homebrew images remain visible and selecting one reports that
+it is not a supported Buzz! game; the underlying diagnostic is shown too.
 
-## Uninstall
+The short setup list uses the PC wizard's exact seven numbered choices:
 
-Disable the boot option (if enabled), reboot, delete **Buzz! Bridge** from the XMB, then delete `/dev_hdd0/plugins/ps3buzz/` with a file manager (webMAN, multiMAN).
+1. Buzz! buzzers only
+2. Buzz! buzzers + 1 DualShock
+3. 2 DualShocks, shared
+4. 2 DualShocks, one player each
+5. 1 DualShock, shared
+6. Buzz! buzzers + 2 DualShocks (any slots)
+7. More than 2 controllers (any slots)
 
-If you installed the earlier test app **Buzz! Phones** (`BUZZP0001`), delete it from the XMB.
+Choice 6 encodes custom layout 13 with `(pairs, whole, shared) = (1, 2, 0)`.
+Choice 7 retains the pairs question, DualShock count, and valid sharing options.
+All 14 machine layout names/numbers are retained in C. No user configuration
+file is requested. A known modified netemu blocks ISO patching and check-patch.
+An unrecognized fingerprint (including other stock firmware revisions) requires
+explicit confirmation that the console keeps its original netemu. ISO restoration
+remains available. An already patched ISO is identified and
+warned about during inspection.
 
-## Other versions of the games
+The C patcher follows the supplied `bb_patch.py`: one unambiguous
+`/IOP/USBD.IRX` or `/SYSTEM/USBD.IRX`, three known original SHA1 fingerprints,
+unchanged ISO directory entries, replacement module plus zero fill to the
+original file length. The supplied universal patcher does **not** edit
+SYSTEM.CNF or IOPRP images; neither does this port. Embedded-only/unknown
+layouts are refused. Firmware runtime substitution has separate IOPRP logic.
 
-[PORTING.md](PORTING.md) explains how to check another Buzz! version with `tools/extract_eboot.py` and `tools/inspect_game.py`, how to read the logs and how to add a profile.
+Only the module extent (normally about 35 KB) is changed. Its original bytes
+are saved in `<ISO>.usbd.orig`, expected patched bytes in `<ISO>.usbd.buzz`,
+and size, mtime, offset, length, layout, SHA1 and SHA256 checks in
+`<ISO>.bbps3.json`. All three are synced and read back before the ISO write.
+Restore verifies image geometry and both recovery blobs, accepts an exact or
+interrupted write, refuses unrelated extent bytes, and writes/verifies the
+original bytes. After a clean restore a new layout may reuse the verified
+original backup; generated expected bytes/metadata are refreshed while the ISO
+is still original. The original backup is never overwritten. Recovery files
+remain after restoration and should stay beside the ISO when moved.
 
-## Build from source
+## PC alternatives on Linux and macOS
 
-Windows, [PS3DK](https://github.com/FirebirdTA01/PS3DK) v0.26.0, Python 3 with PyCryptodome, CMake, Ninja; the PC tests use Clang and Node.
+The PC distribution provides `install.sh` and `restore.sh` for the CFW netemu
+route. For ISO patching, the repository also provides the standard-library-only
+Python patcher: from its `ps2/` directory run `python3 buzz_bridge_ps2.py` with
+the ISO path and desired options. It needs Python 3 and no pip dependencies.
+Keep original netemu when using the ISO route; the two routes must not be combined.
+These PC scripts were not executed in this work.
+
+## Build and offline tests
+
+From the workspace root:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File build_ps3.ps1 -Sdk <PS3DK folder>
-python -B plugin/tests/run_all.py
+powershell -NoProfile -ExecutionPolicy Bypass -File ps3/build_ps3.ps1
+python -B tests/run_all.py
 ```
 
-The SELF signing step reads public key files from `research/load10/` (RPCS3's `rpcs3/Crypto/key_vault.cpp` and PSL1GHT's key headers), which are not included in this repository. The build also compares against the console-verified binaries it keeps in `build/`; a fresh clone needs those steps adjusted. [DESIGN.md](DESIGN.md) describes how it works.
+The SDK remains read only. Build outputs are `deliverables/BuzzBridge.pkg` (full) and
+`deliverables/BuzzBridge-public.pkg`, with actual finalized-package member hashes
+in `package_manifest.json` and `package_manifest-public.json`.
+The installed host PyCryptodome package supplies AES for read-only PKG acceptance. Both app variants are rebuilt;
+the existing signed phone/helper binaries are retained and hash-pinned in
+`ps3/payloads/`. No SDK install, PS3 connection, game launch, flash write or
+installer execution is performed by these commands. Exact manual console
+test steps and remaining limits are in [REPORT.md](../REPORT.md).
 
-## Legal
+## Diagnostics
 
-No game data is included. You need your own copy of the game. The phone page comes from the PCSX2 phone controller in [../pcsx2](../pcsx2) (formerly buzz-web-controller, MIT).
+- The app keeps a log at `/dev_hdd0/tmp/buzzbridge_app.log` and a heartbeat (one line every 5 seconds: memory, frame and flip counts, open files) at `/dev_hdd0/tmp/buzzbridge_heartbeat.log`. Send both if something goes wrong.
+- After 15 minutes without any button press at a menu or dialog, the app returns to the XMB by itself.

@@ -1,18 +1,25 @@
 /* SPDX-License-Identifier: MIT. Minimal XMB system-dialog menu, based on PS3DK samples. */
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/stat.h>
+#ifdef BUZZ_APP_HOST_TEST
+#include "app_flow_mock.h"
+#else
+#include <unistd.h>
 #include <sys/process.h>
-#include "app_ui.h"
 #include <cell/msg_dialog.h>
 #include <cell/sysmodule.h>
 #include <net/netctl.h>
+#include "ps3_api.h"
+#endif
+#include "app_ui.h"
 #include "logic.h"
 #include "files.h"
-#include "ps3_api.h"
+#include "menu.h"
 /* GCM renderer and independent watchdog need an ordinary application stack. */
 SYS_PROCESS_PARAM(1100,0x100000);
+/* 32 MiB renderer arena plus bounded SELF buffers; SDK default is 64 MiB. */
+PS3TC_HEAP_SIZE(UINT64_C(80)*1024*1024);
 static char url[64]="http://<ps3-ip>:8420/";
 static const char *platform="CFW/Cobra";
 static void info(const char *status)
@@ -59,27 +66,40 @@ int main(void)
  app_log("network init complete net=%d ctl=%d owned=%d url=%s",net_module,ctl_module,net_owned,url);
  char message[640]="";
  (void)mkdir("/dev_hdd0/plugins",0777);(void)mkdir(BUZZ_DIR,0777);(void)mkdir("/dev_hdd0/tmp",0777);
+ int installed=0;
+root:
+ if(app_exiting()||bb_main_menu()<0)goto finish;
+ if(installed<0){info("Payload installation failed. Restart the app before retrying.");goto root;}
+ if(!installed) {
  app_stage("install begin: safety disable then packaged payloads");
  if(app_exiting())goto finish;
  int was_disabled=present(BUZZ_DISABLE);
- if(touch_disable()) {info("Cannot create safety disable file. Installation stopped.");goto finish;}
+ installed=-1; /* Attempt only once, including failure; retain safety disable. */
+ if(touch_disable()) {info("Cannot create safety disable file. Installation stopped.");goto root;}
  /* Payloads from our installed USRDIR only, never from mounted game paths. */
- if(buzz_install("/dev_hdd0/game/BUZZB0001/USRDIR",BUZZ_DIR,message,sizeof(message))) {info(message);goto finish;}
+ if(buzz_install("/dev_hdd0/game/BUZZB0001/USRDIR",BUZZ_DIR,message,sizeof(message))) {info(message);goto root;}
  app_stage("install complete: all three payloads verified and activated");
  if(app_exiting())goto finish;
- if(!was_disabled && unlink(BUZZ_DISABLE)) {info("Installed, but disable file could not be cleared.");goto finish;}
- snprintf(message,sizeof(message),"Buzz! Bridge (%s; signing rev 0A)\nPhone URL (in supported game): %s\n\nStart for this session?\nYes: start helper, then exit to XMB.\nNo: boot options. Circle: exit.\n\nBoot files are unchanged by session start.",platform,url);
+ if(!was_disabled && unlink(BUZZ_DISABLE)) {info("Installed, but disable file could not be cleared.");goto root;}
+ installed=1;
+ }
+start:
+ if(app_exiting())goto finish;
+ snprintf(message,sizeof(message),"Buzz! Bridge (%s; signing rev 0A)\nPhone URL (in supported game): %s\n\nStart for this session?\nYes: start helper, then exit to XMB.\nNo: boot options. Circle: back.\n\nBoot files are unchanged by session start.",platform,url);
  int choice=app_dialog(message,1);
  app_log("choice session=%d",choice);
  if(choice==CELL_MSGDIALOG_BUTTON_YES) {
   app_stage("session helper start enter");
   int rc=session(message,sizeof(message));app_log("session result=%d %s",rc,message);info(message);goto finish;
  }
- if(app_exiting() || choice==CELL_MSGDIALOG_BUTTON_ESCAPE)goto finish;
- choice=app_dialog("Enable Buzz! Bridge at boot?\nYes: add exactly one helper line with a backup.\nNo: Disable at boot option. Circle: exit.\n\nTest session mode successfully first.\nHEN loads after activation; USB boot lists can override HDD.",1);
+ if(app_exiting())goto finish;
+ if(choice==CELL_MSGDIALOG_BUTTON_ESCAPE)goto root;
+enable:
+ if(app_exiting())goto finish;
+ choice=app_dialog("Enable Buzz! Bridge at boot?\nYes: add one helper line with a backup, then exit.\nNo: disable at boot option. Circle: back.\n\nTest session mode successfully first.\nHEN loads after activation; USB boot lists can override HDD.",1);
  app_log("choice enable_boot=%d",choice);
  if(choice==CELL_MSGDIALOG_BUTTON_YES) {
-  if(present("/dev_usb000/boot_plugins.txt")||present("/dev_usb001/boot_plugins.txt")) {info("USB boot list detected. HDD boot changes refused; unplug that USB and retry.");goto finish;}
+  if(present("/dev_usb000/boot_plugins.txt")||present("/dev_usb001/boot_plugins.txt")) {info("USB boot list detected. HDD boot changes refused; unplug that USB and retry.");goto enable;}
   app_stage("boot edit enter");
   int rc=buzz_edit_boot_file(BUZZ_BOOT,1,message,sizeof(message));
   app_log("boot edit result=%d %s",rc,message);
@@ -89,12 +109,17 @@ int main(void)
   }
   info(message);goto finish;
  }
- if(app_exiting() || choice==CELL_MSGDIALOG_BUTTON_ESCAPE)goto finish;
- choice=app_dialog("Disable Buzz! Bridge at boot?\nYes: remove only this helper's lines, keep a backup, and create its disable file.\nNo / Circle: leave boot settings unchanged and exit.",1);
+ if(app_exiting())goto finish;
+ if(choice==CELL_MSGDIALOG_BUTTON_ESCAPE)goto start;
+disable:
+ if(app_exiting())goto finish;
+ choice=app_dialog("Disable Buzz! Bridge at boot?\nYes: remove this helper's lines, keep a backup, create its disable file, then exit.\nNo: leave boot settings unchanged and exit.\nCircle: back.",1);
  app_log("choice disable_boot=%d",choice);
+ if(app_exiting())goto finish;
+ if(choice==CELL_MSGDIALOG_BUTTON_ESCAPE)goto enable;
  if(choice==CELL_MSGDIALOG_BUTTON_YES) {
-  if(present("/dev_usb000/boot_plugins.txt")||present("/dev_usb001/boot_plugins.txt")) {info("USB boot list detected. HDD boot changes refused; unplug that USB and retry.");goto finish;}
-  if(touch_disable()) {info("Cannot create disable file. Boot list left unchanged.");goto finish;}
+  if(present("/dev_usb000/boot_plugins.txt")||present("/dev_usb001/boot_plugins.txt")) {info("USB boot list detected. HDD boot changes refused; unplug that USB and retry.");goto disable;}
+  if(touch_disable()) {info("Cannot create disable file. Boot list left unchanged.");goto disable;}
   app_stage("boot edit enter");
   int rc=buzz_edit_boot_file(BUZZ_BOOT,0,message,sizeof(message));
   app_log("boot edit result=%d %s",rc,message);
