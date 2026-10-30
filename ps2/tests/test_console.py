@@ -86,7 +86,7 @@ class ConsoleTests(unittest.TestCase):
                 self.assertIn('Either half works.', out)
 
     def test_custom_wizard_terminal_summary_and_no_extra_setup_question(self):
-        rc,out,err = self.terminal_run(answers=('6','1','3','2'))
+        rc,out,err = self.terminal_run(answers=('7','1','3','2'))
         self.assertEqual(rc,0,err)
         for fragment in ('More than 2 controllers (any slots)','Total: 6 players','Who uses what',
                          'Whole DualShocks','Shared DualShocks','Left player','Right player','3 / Patching'):

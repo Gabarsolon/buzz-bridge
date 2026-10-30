@@ -75,7 +75,7 @@ Restoration refuses wrong checksums, changed extents and unrelated USBD edits. R
 
 ## Setups and controller buttons
 
-Menu choices are **1-6**. Entries 1-5 retain their original mappings. Entry 6 asks three numbers:
+Menu choices are **1-7**. Entries 1-5 retain their original mappings. Entry 6 is the ready-made setup for Buzz! buzzers + 2 DualShocks (4 players). Entry 7 asks about your controllers:
 
 | Menu | Setup | Players |
 |---|---|---|
@@ -84,9 +84,10 @@ Menu choices are **1-6**. Entries 1-5 retain their original mappings. Entry 6 as
 | 3 | 2 DualShocks, shared | 4 |
 | 4 | 2 DualShocks, one player each | 2 |
 | 5 | 1 DualShock, shared | 2 |
-| 6 | More than 2 controllers (any slots) | 1-8 |
+| 6 | Buzz! buzzers + 2 DualShocks (any slots) | 4 |
+| 7 | More than 2 controllers (any slots) | 1-8 |
 
-For entry 6 the patcher asks how many **pairs of Buzz! buzzers** (0-2) and how many **DualShocks** you have (each question shows its default), then lists every way you can play with them and you pick one. Every DualShock you share (left half = one player, right half = another) adds one player, up to 8. For example, with 1 pair of buzzers and 3 DualShocks you can play with 5, 6, 7 or 8 players. The tool then shows a summary and the button tables.
+For entry 7 the patcher asks how many **pairs of Buzz! buzzers** you have (0-2; a Buzz! set with 4 buzzers counts as 1 pair because on a PS3 only 2 of its 4 buzzers work) and how many **DualShocks** you have (each question shows its default), then lists every way you can play with them and you pick one. Every DualShock you share (left half = one player, right half = another) adds one player, up to 8. For example, with 1 pair of buzzers and 3 DualShocks you can play with 5, 6, 7 or 8 players. The tool then shows a summary and the button tables.
 
 No extra hardware is needed: the patch reads the emulator's controller slots. On PS3, assign controllers with the PS button as usual. In PCSX2, enable its built-in multitap setting under **Settings > Controllers > Global Settings** for the console ports you use, then set their A-D slots to DualShock 2. More than four players need a game that uses two buzzer sets, such as Schools Quiz; the Junior games and The Music Quiz have four-player limits.
 

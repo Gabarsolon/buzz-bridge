@@ -252,24 +252,27 @@ DIAG_TAP_HELP = ('hold Select+Start on the multitap slot A controller to join th
 
 
 MENU = (
-    (0, 'Buzz! buzzers only', 2),
-    (1, 'Buzz! buzzers + 1 DualShock', 4),
-    (2, '2 DualShocks, shared', 4),
-    (3, '2 DualShocks, one player each', 2),
-    (4, '1 DualShock, shared', 2),
-    (13, 'More than 2 controllers (any slots)', '1-8'),
+    (0, 'Buzz! buzzers only', 2, None),
+    (1, 'Buzz! buzzers + 1 DualShock', 4, None),
+    (2, '2 DualShocks, shared', 4, None),
+    (3, '2 DualShocks, one player each', 2, None),
+    (4, '1 DualShock, shared', 2, None),
+    (13, 'Buzz! buzzers + 2 DualShocks (any slots)', 4, (1, 2, 0)),
+    (13, 'More than 2 controllers (any slots)', '1-8', None),
 )
 
 
 def ask_layout(console=None):
+    """Returns (layout id, preset counts or None); counts are only used by layout 13."""
     console = console or Console()
     console.section(2, 'Your setup')
     print('What do you have?')
-    width = max(len(name) for _, name, _ in MENU)
-    for n, (layout_id, name, players) in enumerate(MENU, 1):
-        if layout_id == 13:
-            print("  no extra hardware needed, the patch uses the emulator's built-in multitap.", flush=True)
-        label = '%d)' % n
+    width = max(len(name) for _, name, _, _ in MENU)
+    first_any_slot = next(n for n, row in enumerate(MENU) if row[0] == 13)
+    for n, (layout_id, name, players, preset) in enumerate(MENU):
+        if n == first_any_slot:
+            print("  more than 2 controllers: no extra hardware needed, the patch uses the emulator's built-in multitap.", flush=True)
+        label = '%d)' % (n + 1)
         if console.enabled:
             label = console.paint(label, '1;96')
         print('  %s  %-*s  %3s players' % (label, width, name, players), flush=True)
@@ -279,7 +282,8 @@ def ask_layout(console=None):
         except EOFError:
             raise PatchError('no setup selected; use --layout for non-interactive use') from None
         if answer.isdigit() and 1 <= int(answer) <= len(MENU):
-            return MENU[int(answer) - 1][0]
+            layout_id, _, _, preset = MENU[int(answer) - 1]
+            return layout_id, preset
         print('Please enter a number from 1 to %d.' % len(MENU))
 
 
@@ -319,7 +323,8 @@ def describe_option(pairs, whole, shared):
 
 
 def ask_custom():
-    pairs = ask_number('How many pairs of Buzz! buzzers do you have? (each pair = 2 players)', 0, 0, 2)
+    print('A Buzz! set (4 buzzers + 1 receiver) counts as 1 pair: on a PS3 only 2 of its 4 buzzers work.')
+    pairs = ask_number('How many pairs of Buzz! buzzers do you have? (1 pair = 2 players)', 0, 0, 2)
     dualshocks = ask_number('How many DualShocks do you have?', max(0, 4 - 2 * pairs), 0, 8)
     if pairs == 0 and dualshocks == 0:
         raise PatchError('You need at least one pair of Buzz! buzzers or one DualShock')
@@ -487,7 +492,7 @@ def cmd_patch(args):
             raise PatchError('custom needs --buzzer-pairs, --whole-ds and/or --shared-ds, with --layout omitted')
         console.section(2, 'Your setup')
     else:
-        layout = ask_layout(console)
+        layout, counts = ask_layout(console)
     if layout == 13:
         counts = counts if counts is not None else ask_custom()
         console.custom_setup(*counts)

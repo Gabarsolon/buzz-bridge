@@ -341,7 +341,7 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual((cfg['layout'], cfg['flags']), (2, 0x11))
 
     def test_menu_maps_choices_to_layouts_and_has_no_fixed_multitap_setups(self):
-        rc, so, se = run(self.p, input_text=['6', '', '', ''])
+        rc, so, se = run(self.p, input_text=['7', '', '', ''])
         self.assertEqual(rc, 0, se)
         self.assertNotIn('Turn on the multitap check', so)
         self.assertNotIn('CONFIG', so)
@@ -353,13 +353,15 @@ class SafetyTests(unittest.TestCase):
         rc, so, se = run(self.p, input_text=['1'])
         self.assertEqual(rc, 0, se)
         rows = [l for l in so.splitlines() if l[:3].strip().rstrip(')').isdigit() and ' players' in l]
-        self.assertEqual(len(rows), 6)
+        self.assertEqual(len(rows), 7)
         self.assertEqual(len(set(l.index(' players') for l in rows)), 1, rows)
 
     def test_custom_wizard_defaults_and_all_menu_choices(self):
-        for choice, expected in enumerate((0,1,2,3,4,13),1):
+        # menu choice -> (layout, (pairs, whole, shared) or None)
+        for choice, expected, counts in ((1,0,None),(2,1,None),(3,2,None),(4,3,None),(5,4,None),
+                                         (6,13,(1,2,0)),(7,13,(0,4,0))):
             target = os.path.join(self.tmp,'menu_%d.iso' % choice)
-            answers = [str(choice)] + (['','',''] if choice == 6 else [])
+            answers = [str(choice)] + (['','',''] if choice == 7 else [])
             rc,so,se = run(self.p,'--out',target,input_text=answers)
             self.assertEqual(rc,0,so+se)
             cfg = bb_patch.read_config(rd(target)[self.meta['usbd_lba']*SECTOR:])
@@ -367,15 +369,13 @@ class SafetyTests(unittest.TestCase):
             self.assertEqual(cfg['flags'],0x11)
             self.assertNotIn('CONFIG',so)
             self.assertEqual(so.lower().count('multitap'),1)
-            if choice == 6:
-                self.assertEqual((cfg['buzzer_pairs'],cfg['whole_ds'],cfg['shared_ds']),(0,4,0))
-                self.assertEqual((cfg['players'],cfg['dongles']),(4,1))
-                self.assertIn('Total: 4 players',so)
-                self.assertIn('Whole DualShocks',so)
+            if counts:
+                self.assertEqual((cfg['buzzer_pairs'],cfg['whole_ds'],cfg['shared_ds']),counts)
+                self.assertEqual((cfg['players'],cfg['dongles']),(2*counts[0]+counts[1]+2*counts[2],1))
                 self.assertIn('Select, Start, L3 and R3 also buzz red.',so)
 
     def test_custom_wizard_validation_summary_and_encoding(self):
-        rc,so,se = run(self.p,input_text=['6','bad','-1','3','1','9','2.5','3','0','9','2'])
+        rc,so,se = run(self.p,input_text=['7','bad','-1','3','1','9','2.5','3','0','9','2'])
         self.assertEqual(rc,0,so+se)
         self.assertEqual(so.count('Please enter a whole number'),7)
         self.assertIn('Total: 6 players',so)
@@ -424,6 +424,7 @@ class SafetyTests(unittest.TestCase):
                 bb_patch.ask_custom()
         self.assertEqual([p.split('[')[-1] for p in prompts], ['default: 0]: ', 'default: 4]: '])
         self.assertIn('at least one pair of Buzz! buzzers or one DualShock', str(raised.exception))
+        self.assertIn('How many pairs of Buzz! buzzers', prompts[0])
         answers = iter(['1', '3', '2'])
         prompts.clear()
         with unittest.mock.patch('builtins.input', fake_input), contextlib.redirect_stdout(io.StringIO()) as out:
@@ -431,7 +432,8 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual([p.split('[')[-1] for p in prompts], ['default: 0]: ', 'default: 2]: ', 'default: 1]: '])
         self.assertIn('You can play with:', out.getvalue())
         self.assertIn('6 players: 1 pair of Buzz! buzzers + 2 DualShocks, one player each + 1 DualShock shared', out.getvalue())
-        rc, so, se = run(self.p, input_text=['6', '0', '0'])
+        self.assertIn('on a PS3 only 2 of its 4 buzzers work', out.getvalue())
+        rc, so, se = run(self.p, input_text=['7', '0', '0'])
         self.assertEqual(rc, 1, so + se)
         self.assertIn('at least one pair of Buzz! buzzers or one DualShock', se)
         self.assertEqual(os.listdir(self.tmp), ['Game.iso'])
