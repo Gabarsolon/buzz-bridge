@@ -20,14 +20,15 @@
 #include "ds3.h"
 #include "ds3_trace.h"
 #include "ds3_journal.h"
+#include "ds3_jitter.h"
+#include "bridge_settings.h"
 #include "pico/unique_id.h"
 
 uint8_t bridge_mode=MODE_CLONE;
 bool bridge_debug=true;
 // Do not use the final sector: RP2350 UF2 E10 mitigation can erase it.
 #define SETTINGS_OFFSET (PICO_FLASH_SIZE_BYTES-2*FLASH_SECTOR_SIZE)
-#define SETTINGS_MAGIC 0x42555a31u
-typedef struct {uint32_t magic,version,mode_debug,local_flags,hold_ms,crc;} settings_t;
+#define SETTINGS_MAGIC BRIDGE_SETTINGS_MAGIC
 typedef struct {uint8_t raw[5];} sample_t;
 typedef struct {char text[384];} log_t;
 typedef struct {uint8_t data[7];bool local;uint32_t epoch;} lamp_t;
@@ -49,6 +50,7 @@ static bool ds3_lease_active;
 static uint32_t now_ms(void);
 static void ds3_packet(uint32_t bits,uint8_t payload[48]) {
   ds3_input(ds3_streaming()?bits:0,payload);
+  ds3_jitter_apply(payload);
   if(ds3_ps_value(now_ms()))payload[3]=1;
 }
 // Everything below except queues/counters is used by exactly one core.
@@ -81,23 +83,14 @@ static void bridge_log(const char *fmt,...) {
   log_t l;va_list ap;va_start(ap,fmt);vsnprintf(l.text,sizeof(l.text),fmt,ap);va_end(ap);
   if(!queue_try_add(&logs,&l))__atomic_fetch_add(&log_drops,1,__ATOMIC_RELAXED);
 }
-static uint32_t crc32(const void *buffer,size_t n) {
-  const uint8_t *p=buffer;uint32_t crc=0xffffffffu;
-  while(n--){crc^=*p++;for(unsigned b=0;b<8;b++)crc=(crc>>1)^(0xedb88320u&-(crc&1u));}
-  return ~crc;
-}
-static bool settings_valid(const settings_t *s) {
-  return s->magic==SETTINGS_MAGIC&&(s->version==2||s->version==3)&&(s->mode_debug&0xff)<=2&&
-    !(s->mode_debug&~0x103u)&&s->local_flags<=(s->version==3?15u:7u)&&s->hold_ms>=100&&s->hold_ms<=10000&&
-    s->crc==crc32(s,20);
-}
 static void settings_load(void) {
   settings_t s;memcpy(&s,(const void *)(XIP_BASE+SETTINGS_OFFSET),sizeof(s));
-  if(settings_valid(&s)) {
+  if(bridge_settings_valid(&s)) {
     bridge_mode=s.mode_debug&0xff;bridge_debug=(s.mode_debug&0x100)!=0;
     local_enabled=(s.local_flags&1)!=0;local_first=(s.local_flags&2)!=0;rumble_probe=(s.local_flags&4)!=0;local_hold_ms=s.hold_ms;
     if(s.version==3)ds3_auto_ps=(s.local_flags&8)!=0;
-  } else if(s.magic==SETTINGS_MAGIC&&s.version==1&&s.mode_debug<=3&&s.local_flags==crc32(&s,12)) {
+    ds3_jitter_enable(bridge_settings_jitter((const uint8_t *)(XIP_BASE+SETTINGS_OFFSET)));
+  } else if(s.magic==SETTINGS_MAGIC&&s.version==1&&s.mode_debug<=3&&s.local_flags==bridge_settings_crc32(&s,12)) {
     bridge_mode=s.mode_debug&1;bridge_debug=(s.mode_debug&2)!=0;
   }
 #if BUZZ_RECOVERY
@@ -113,7 +106,7 @@ static void schedule_save(uint8_t mode,bool debug) {
   if(!host_core_ready){bridge_log("FAIL host core not ready; retry command\r\n");return;}
   pending_settings=(settings_t){SETTINGS_MAGIC,3,mode|(debug?0x100u:0u),
     (local_enabled?1u:0u)|(local_first?2u:0u)|(rumble_probe?4u:0u)|(ds3_auto_ps?8u:0u),local_hold_ms,0};
-  pending_settings.crc=crc32(&pending_settings,20);
+  pending_settings.crc=bridge_settings_crc32(&pending_settings,20);
   action=ACTION_SAVE;action_at=now_ms()+300;
   bridge_log("CONFIG_SAVING mode=%c debug=%u; rebooting\r\n",'A'+mode,debug);
 }
@@ -267,7 +260,7 @@ static void ds3_activation_task(void) {
   if(bridge_mode!=MODE_DS3)return;
   uint32_t bits=injected?buzz_buttons(current_raw):local_buttons;
   uint32_t before=ds3_ps_count();ds3_activation_tick(bits,now_ms());
-  if(ds3_ps_count()!=before)bridge_log("DS3_PS requested auto_or_four_red count=%lu\r\n",(unsigned long)ds3_ps_count());
+  if(ds3_ps_count()!=before)bridge_log("DS3_PS requested startup_manual_or_wake count=%lu wake_used=%u\r\n",(unsigned long)ds3_ps_count(),ds3_wake_used());
   ds3_trace_state(ds3_ps_count(),ds3_enable_count(),ds3_disable_count(),now_ms());
   // P1 red + blue for 3 seconds is a deliberate recovery chord. Save debug-on
   // so unplugging/powering off after the switch still exposes CDC on the PC.
@@ -303,6 +296,7 @@ void tud_hid_set_report_cb(uint8_t instance,uint8_t id,hid_report_type_t type,co
     if(type==HID_REPORT_TYPE_FEATURE) {
       bool ok=ds3_feature_set(id,buf,len);
       if(ok&&id==0xf4&&ds3_streaming())ds3_enable_anchor(now_ms());
+      if(ok&&id==0xf4&&!ds3_streaming())ds3_disable_anchor(now_ms());
       bridge_log("DS3_SET_FEATURE id=%02X bytes=%u accepted=%u\r\n",id,len,ok);return;
     }
     if(type==HID_REPORT_TYPE_OUTPUT) {
@@ -356,9 +350,10 @@ static void status(void) {
   bridge_log("RAW %02X %02X %02X %02X %02X\r\n",live_raw[0],live_raw[1],live_raw[2],live_raw[3],live_raw[4]);
   bridge_log("LOCAL_STATUS enabled=%u policy=%s hold_ms=%lu owner=%s mask=%X\r\n",local_enabled,
     local_first?"first":"follow",(unsigned long)local_hold_ms,local_policy.remote_owned?"host":"local",local_policy.mask);
-  if(bridge_mode==MODE_DS3)bridge_log("DS3_STATUS streaming=%u auto_ps=%u ps_pulses=%lu lamp_lease=%u rumble_probe=%u controls=%lu in_acked=%lu out=%lu\r\n",
+  if(bridge_mode==MODE_DS3)bridge_log("DS3_STATUS streaming=%u auto_ps=%u ps_pulses=%lu lamp_lease=%u rumble_probe=%u controls=%lu in_acked=%lu out=%lu jitter=%u wake_used=%u wake_left=%u wake_pending=%u\r\n",
     ds3_streaming(),ds3_auto_ps,(unsigned long)ds3_ps_count(),ds3_lease_active,rumble_probe,
-    (unsigned long)ds3_trace_counts()->controls,(unsigned long)ds3_trace_counts()->in_acked,(unsigned long)ds3_trace_counts()->out_reports);
+    (unsigned long)ds3_trace_counts()->controls,(unsigned long)ds3_trace_counts()->in_acked,(unsigned long)ds3_trace_counts()->out_reports,
+    ds3_jitter_enabled(),ds3_wake_used(),3u-ds3_wake_used(),ds3_wake_pending());
 }
 static void command(const char *line) {
   char mode,extra;unsigned debug,bits;
@@ -369,6 +364,9 @@ static void command(const char *line) {
     ds3_auto_ps=!strcmp(line,"ds3 auto on");schedule_save(bridge_mode,bridge_debug);return;
   }
   if(!strcmp(line,"ds3 ps")){ds3_request_ps(now_ms());return;}
+  if(!strcmp(line,"jitter on")||!strcmp(line,"jitter off")) {
+    ds3_jitter_enable(!strcmp(line,"jitter on"));schedule_save(bridge_mode,bridge_debug);return;
+  }
   if(!strcmp(line,"rumble probe on")||!strcmp(line,"rumble probe off")) {
     rumble_probe=!strcmp(line,"rumble probe on");schedule_save(bridge_mode,bridge_debug);return;
   }
@@ -389,7 +387,7 @@ static void command(const char *line) {
     local_hold_ms=bits;schedule_save(bridge_mode,bridge_debug);return;
   }
   if(!strcmp(line,"help")) {
-    bridge_log("COMMANDS status | ds3log [save] | ds3 auto on/off | ds3 ps | config a/b/c 0/1 | local on/off/first/follow | local hold 100..10000 | local rearm | rumble probe on/off | mode a/b/c | debug on/off | lamps 0..F | inject HEX20 | live | trial a/b/c (30s) | reboot | boot\r\n");return;
+    bridge_log("COMMANDS status | ds3log [save] | jitter on/off | ds3 auto on/off | ds3 ps | config a/b/c 0/1 | local on/off/first/follow | local hold 100..10000 | local rearm | rumble probe on/off | mode a/b/c | debug on/off | lamps 0..F | inject HEX20 | live | trial a/b/c (30s) | reboot | boot\r\n");return;
   }
   if(sscanf(line,"config %c %u %c",&mode,&debug,&extra)==2&&
      (mode=='a'||mode=='b'||mode=='c')&&debug<2){schedule_save(mode-'a',debug!=0);return;}
@@ -498,14 +496,13 @@ static void action_task(void) {
   if(action==ACTION_BOOTSEL)reset_usb_boot(0,0);
   if(action==ACTION_LOG_SAVE){action=ACTION_NONE;tud_connect();bridge_log("DS3LOG_SAVED explicit detached checkpoint\r\n");return;}
   if(action==ACTION_SAVE) {
-    settings_t old;memcpy(&old,(const void *)(XIP_BASE+SETTINGS_OFFSET),sizeof(old));
+    const void *old=(const void *)(XIP_BASE+SETTINGS_OFFSET);
+    bridge_settings_page(settings_page,&pending_settings,ds3_jitter_enabled());
     int rc=PICO_OK;
-    if(memcmp(&old,&pending_settings,sizeof(old))) {
-      memset(settings_page,0xff,sizeof(settings_page));memcpy(settings_page,&pending_settings,sizeof(pending_settings));
+    if(memcmp(old,settings_page,sizeof(settings_page))) {
       rc=flash_safe_execute(settings_write,NULL,1000);
     }
-    settings_t check;memcpy(&check,(const void *)(XIP_BASE+SETTINGS_OFFSET),sizeof(check));
-    if(rc!=PICO_OK||memcmp(&check,&pending_settings,sizeof(check))) {
+    if(rc!=PICO_OK||memcmp(old,settings_page,sizeof(settings_page))) {
       action=ACTION_NONE;tud_connect();bridge_log("FAIL settings write rc=%d; old active mode retained\r\n",rc);return;
     }
   }
@@ -515,6 +512,8 @@ int main(void) {
   set_sys_clock_khz(120000,true);settings_load();
   pico_unique_board_id_t unique;pico_get_unique_board_id(&unique);
   uint8_t address[6]={0x02,unique.id[3],unique.id[4],unique.id[5],unique.id[6],unique.id[7]};ds3_identity(address);
+  uint32_t seed=time_us_32();for(unsigned i=0;i<sizeof(unique.id);i++)seed=(seed*33u)^unique.id[i];
+  ds3_jitter_seed(seed,now_ms());
   ds3_trace_init();ds3_journal_init();ds3_session_reset(now_ms(),ds3_auto_ps);
   if(watchdog_hw->scratch[0]==TRIAL_MAGIC) {
     if(watchdog_hw->scratch[1]<3) {
@@ -528,9 +527,10 @@ int main(void) {
   queue_init(&logs,sizeof(log_t),64);queue_init(&lamps,sizeof(lamp_t),16);
   gpio_init(PICO_DEFAULT_LED_PIN);gpio_set_dir(PICO_DEFAULT_LED_PIN,GPIO_OUT);
   tud_init(0);multicore_launch_core1(core1_main);
-  bridge_log("BUZZ_BRIDGE modec-v3 mode=%c debug=%u recovery=%u; help for commands\r\n",'A'+bridge_mode,bridge_debug,BUZZ_RECOVERY);
+  bridge_log("BUZZ_BRIDGE modec2-jitter mode=%c debug=%u recovery=%u; help for commands\r\n",'A'+bridge_mode,bridge_debug,BUZZ_RECOVERY);
   while(true) {
     tud_task();device_reports_task();cdc_task();local_task();ds3_journal_task(host_core_ready);ds3_activation_task();action_task();
+    if(bridge_mode==MODE_DS3)ds3_jitter_tick(now_ms());
     if(bridge_mode==MODE_DS3&&ds3_lease_active&&due(now_ms(),ds3_lease_until)) {
       ds3_lease_active=false;const uint8_t off[7]={0};queue_lamps(off);bridge_log("DS3_LAMP_TIMEOUT all off\r\n");
     }

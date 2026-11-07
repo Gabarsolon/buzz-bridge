@@ -17,19 +17,19 @@ def main():
     env['PICO_SDK_PATH']=os.environ['PICO_SDK_PATH']
     (HERE/'tmp').mkdir(exist_ok=True)
     for key in ('TEMP','TMP','TMPDIR'):env[key]=str(HERE/'tmp')
-    cmds=[['cmake','-S',str(HERE/'firmware_source'),'-B',str(HERE/'build_modec'),'-G','Ninja',
+    cmds=[['cmake','-S',str(HERE/'firmware_source'),'-B',str(HERE/'build_modec2'),'-G','Ninja',
            '-DPICO_PLATFORM=rp2350','-DPICO_BOARD=pico2',
            '-DPython3_EXECUTABLE='+sys.executable,
            '-Dpicotool_DIR='+str(ROOT/'examples/build_test/_deps/picotool'),
            '-Dpioasm_DIR='+str(ROOT/'examples/build_test/pioasm-install/pioasm')],
-          ['cmake','--build',str(HERE/'build_modec'),'--target','buzz_bridge_modec','buzz_bridge_modec_recovery']]
-    with (HERE/'build_modec.log').open('w') as log:
+          ['cmake','--build',str(HERE/'build_modec2'),'--target','buzz_bridge_modec2','buzz_bridge_modec2_recovery']]
+    with (HERE/'build_modec2.log').open('w') as log:
       for cmd in cmds:
         p=subprocess.run(cmd,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
         log.write(p.stdout);log.flush()
         if p.returncode:
           print('\n'.join(x for x in p.stdout.splitlines() if re.search(r'(error:|fatal error|^ninja:|^CMake Error)',x))[-5000:])
-          raise RuntimeError('Build failed; see build_modec.log')
+          raise RuntimeError('Build failed; see build_modec2.log')
     print('PASS standard/recovery Mode C builds; all output inside buzz-pico-adapter')
 if __name__=='__main__':
   try:main()

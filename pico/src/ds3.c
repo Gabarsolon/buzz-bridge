@@ -19,6 +19,10 @@ const uint8_t ds3_report_descriptor[148]={
 static uint8_t host_mac[6],device_mac[6]={0x02,0x50,0x49,0x43,0x4f,0x32},ef_byte=0xa0;
 static bool streaming,automatic_ps,configured,auto_done,ps_pending,red_tracking,red_latched;
 static uint32_t auto_at,ps_until,red_since,ps_count,enable_count,disable_count;
+static bool wake_anchor_needed,wake_pending,disabled_seen;
+static uint8_t wake_used;
+static uint32_t wake_at;
+static const uint32_t wake_delay[3]={5000,10000,20000};
 static uint8_t prepare_mask;
 static bool prepared;
 static uint32_t prepare_at;
@@ -28,22 +32,45 @@ void ds3_session_reset(uint32_t now,bool auto_ps) {
   (void)now;streaming=false;automatic_ps=auto_ps;configured=false;auto_done=false;
   ps_pending=false;red_tracking=false;red_latched=false;ps_until=0;
   ps_count=enable_count=disable_count=0;prepared=false;
+  wake_anchor_needed=wake_pending=disabled_seen=false;wake_used=0;wake_at=0;
 }
-void ds3_session_configured(uint32_t now){configured=true;auto_at=now+2000;}
+void ds3_session_configured(uint32_t now){configured=true;auto_at=now+2000;auto_done=false;streaming=false;ps_pending=false;wake_anchor_needed=wake_pending=disabled_seen=false;wake_used=0;}
 void ds3_enable_anchor(uint32_t now){if(!auto_done&&automatic_ps)auto_at=now+2000;}
-void ds3_request_ps(uint32_t now){ps_pending=true;ps_until=now+250;ps_count++;auto_done=true;}
+void ds3_disable_anchor(uint32_t now) {
+  if(!wake_anchor_needed)return;
+  wake_anchor_needed=false;
+  wake_pending=configured&&automatic_ps&&wake_used<3;
+  if(wake_pending)wake_at=now+wake_delay[wake_used];
+}
+uint8_t ds3_wake_used(void){return wake_used;}
+bool ds3_wake_pending(void){return wake_pending||wake_anchor_needed;}
+static void ps_pulse(uint32_t now){ps_pending=true;ps_until=now+250;ps_count++;auto_done=true;}
+void ds3_request_ps(uint32_t now) {
+  // A deliberate manual PS request rearms the bounded wake budget. A host
+  // repeatedly disabling the pad cannot refill it through F4 enable/disable.
+  wake_used=0;wake_pending=false;wake_anchor_needed=false;ps_pulse(now);
+  if(disabled_seen&&!streaming){wake_anchor_needed=true;ds3_disable_anchor(now);}
+}
 void ds3_activation_tick(uint32_t bits,uint32_t now) {
-  if(configured&&automatic_ps&&!auto_done&&(int32_t)(now-auto_at)>=0)ds3_request_ps(now);
+  if(wake_anchor_needed)ds3_disable_anchor(now);
+  bool manual=false;
   if((bits&0x8421u)==0x8421u) {
     if(!red_tracking){red_tracking=true;red_since=now;}
-    if(!red_latched&&now-red_since>=2000){red_latched=true;ds3_request_ps(now);}
+    if(!red_latched&&now-red_since>=2000){red_latched=true;ds3_request_ps(now);manual=true;}
   } else {red_tracking=false;red_latched=false;}
+  if(manual)return;
+  if(configured&&automatic_ps&&!auto_done&&(int32_t)(now-auto_at)>=0)ps_pulse(now);
+  if(wake_pending&&!streaming&&(int32_t)(now-wake_at)>=0) {
+    ps_pulse(now);wake_used++;
+    wake_pending=wake_used<3;
+    if(wake_pending)wake_at=now+wake_delay[wake_used];
+  }
 }
 bool ds3_streaming(void){return streaming;}
 bool ds3_send_allowed(uint32_t now){(void)now;return streaming||ps_pending;}
 bool ds3_ps_value(uint32_t now){return ps_pending||(streaming&&ps_count&&(int32_t)(now-ps_until)<0);}
 void ds3_input_acked(bool ps){if(ps)ps_pending=false;}
-void ds3_linux_usb_poke(void){streaming=true;}
+void ds3_linux_usb_poke(void){streaming=true;wake_pending=wake_anchor_needed=false;}
 uint32_t ds3_ps_count(void){return ps_count;}
 uint32_t ds3_enable_count(void){return enable_count;}
 uint32_t ds3_disable_count(void){return disable_count;}
@@ -99,8 +126,12 @@ bool ds3_feature_set(uint8_t id,const uint8_t *p,uint16_t n) {
   if(id==0xf5&&n>=8){memcpy(host_mac,p+2,6);return true;}
   if(id==0xef&&n>=7&&p[4]==3&&p[5]==1){ef_byte=p[6];return true;}
   if(id==0xf4&&n>=4&&p[0]==0x42&&p[2]==0&&p[3]==0) {
-    if(p[1]==0x0c){streaming=true;enable_count++;return true;}
-    if(p[1]==0x0b){streaming=false;ps_pending=false;auto_done=true;disable_count++;return true;}
+    if(p[1]==0x0c){streaming=true;wake_pending=wake_anchor_needed=false;enable_count++;return true;}
+    if(p[1]==0x0b){
+      streaming=false;ps_pending=false;auto_done=true;disabled_seen=true;disable_count++;
+      if(!wake_pending&&!wake_anchor_needed&&wake_used<3)wake_anchor_needed=true;
+      return true;
+    }
   }
   return false;
 }

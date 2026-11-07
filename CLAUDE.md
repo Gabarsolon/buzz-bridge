@@ -1,6 +1,6 @@
 # CLAUDE.md: Buzz! Bridge
 
-Public repo `Gabarsolon/buzz-bridge` (MIT). Lets PS2 Buzz! games take real buzzers, phones or DualShocks on a PS3 CFW/HEN console (and PCSX2). Latest release: **v1.4.0** (Pico adapter + layout 14; v1.3.0 tag at `9d757e5`). Owner: Gabarsolon, own console (PS3 slim CECH-25xx, Evilnat 4.93 + Cobra, webMAN MOD, `192.168.0.169`).
+Public repo `Gabarsolon/buzz-bridge` (MIT). Lets PS2 Buzz! games take real buzzers, phones or DualShocks on a PS3 CFW/HEN console (and PCSX2). Latest release: **v1.4.1** (v1.4.0 = Pico adapter + layout 14; v1.3.0 tag at `9d757e5`). Owner: Gabarsolon, own console (PS3 slim CECH-25xx, Evilnat 4.93 + Cobra, webMAN MOD, `192.168.0.169`).
 
 ## Layout
 

@@ -1,0 +1,18 @@
+{
+  "buzz_bridge_modec2.uf2": {
+    "bytes": 270848,
+    "sha256": "4ba4433f96961d9cf549fd96e5e79348f9d3923debdcf8dda66bee5c7900d189"
+  },
+  "buzz_bridge_modec2.bin": {
+    "bytes": 135072,
+    "sha256": "c494793cfb0863eec0b1adcbe73b475ef5c03617b088103ab4c29679f5c1ff41"
+  },
+  "buzz_bridge_modec2_recovery.uf2": {
+    "bytes": 270848,
+    "sha256": "4e9e0680e84eae0a96c66a59ec6f6025078b5df7e4e909d8e9613bf0f8bb4f6a"
+  },
+  "buzz_bridge_modec2_recovery.bin": {
+    "bytes": 135064,
+    "sha256": "19c225d25045bbee891d2a265ff85364cdefe4f7f16ebc06cbd2da169a2465ce"
+  }
+}

@@ -12,11 +12,13 @@ A Raspberry Pi **Pico 2** (RP2350) sits between a wired Buzz! dongle and the PS3
 
 Mode C is the one to use. Modes A and B are kept for testing.
 
+**Idle:** on the PS3, a Mode C session was disabled by the console about 14 minutes after it started (the saved request log shows the PS3's disable command), and the pad stayed dead until the Pico was reflashed. Version 1.4.1 therefore adds small bounded noise to the DualShock's motion-sensor bytes, like a real pad (`jitter on|off` over the debug port, default on), and up to three delayed automatic PS-button presses after a PS3 disable. **This is not yet tested on a PS3**: whether it keeps the pad alive over a long idle is unproven.
+
 ## Tested
 
 One CFW PS3 slim (Evilnat 4.93, **stock** `ps2_netemu.self`), Pico 2 H, wired Namtai dongle (054C:1000), *Buzz! The Schools Quiz*:
 - Mode B: all four handsets.
-- Mode C: all four handsets and the game's lamps work (owner-confirmed). The PS3 enumerated the Pico as a DualShock 3, enabled it, and the saved request log shows the normal startup (8 feature reads, PS pulse, enable) and 80k+ input reports without a failure.
+- Mode C (the 1.4.0 firmware): all four handsets and the game's lamps work (owner-confirmed). The 1.4.1 firmware has the same Mode C plus the idle changes and is untested on the PS3. The PS3 enumerated the Pico as a DualShock 3, enabled it, and the saved request log shows the normal startup (8 feature reads, PS pulse, enable) and 80k+ input reports without a failure.
 - Rumble reaching the Pico: Gran Turismo collision lights the lamps.
 
 **Not tested:** HEN (the design needs nothing on the console, but nobody has run it), other games and PS3 models, other dongles, the Pico 1 / RP2040.
@@ -42,7 +44,7 @@ Power comes from the PS3 over the micro-USB cable. Plug the wired Buzz! dongle i
 ## Flash
 
 1. Hold **BOOTSEL**, plug the Pico into your PC, release the button. A drive named `RP2350` appears.
-2. Copy `firmware/buzz_bridge_modec.uf2` onto that drive. It reboots by itself.
+2. Copy `firmware/buzz_bridge_modec2.uf2` onto that drive. It reboots by itself.
 
 The first boot is Mode A with a debug COM port.
 
@@ -54,9 +56,9 @@ You need Python 3 with `pyserial` (`pip install pyserial`). From `pico/tools`:
 python bridge_cli.py config c 0
 ```
 
-`config <a|b|c> <0|1>`: mode, then whether the debug COM port is on (1) or off (0). For the PS3 use debug off (`c 0`): the Pico then shows only as the DualShock. The setting is saved in flash and survives reflashing the normal image. Other commands: `status`, `ds3log` (the PS3's startup requests, read after a session), `rumble probe on|off` (diagnostic: any rumble lights all four lamps, leave it **off** for games), `local ...` (Mode A lamp options).
+`config <a|b|c> <0|1>`: mode, then whether the debug COM port is on (1) or off (0). For the PS3 use debug off (`c 0`): the Pico then shows only as the DualShock. The setting is saved in flash and survives reflashing the normal image. Other commands: `status`, `ds3log` (the PS3's startup requests, read after a session), `jitter on|off`, `rumble probe on|off` (diagnostic: any rumble lights all four lamps, leave it **off** for games), `local ...` (Mode A lamp options).
 
-**Getting the debug port back** from a clean mode: hold **P1 red + P1 blue together for 5 seconds**. The Pico saves its log and reboots with the debug port (`CAFE:B003`). Or hold BOOTSEL while plugging in and flash `firmware/buzz_bridge_modec_recovery.uf2`, which forces the port on; then run `bridge_cli.py config c 1` and flash the normal image again.
+**Getting the debug port back** from a clean mode: hold **P1 red + P1 blue together for 5 seconds**. The Pico saves its log and reboots with the debug port (`CAFE:B003`). Or hold BOOTSEL while plugging in and flash `firmware/buzz_bridge_modec2_recovery.uf2`, which forces the port on; then run `bridge_cli.py config c 1` and flash the normal image again.
 
 ## Patch the game and play
 
@@ -87,6 +89,6 @@ Protocol details (report bytes, the lamp code carried in the motor values): [doc
 
 ## Source and building
 
-`src/` is the firmware (C, pico-sdk + TinyUSB + [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB), all MIT/BSD). `tools/` has the PC helpers and a reference Windows build script (`build_modec.py`, needs `PICO_SDK_PATH`, the Arm GNU toolchain, Ninja, MSVC Build Tools; it expects this folder at `<Pico-PIO-USB>/buzz-pico-adapter` with `src/` renamed `firmware_source/`). The prebuilt UF2s are what was tested; hashes are in `firmware/SHA256_MODEC.json`. Third-party notices: [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md), [docs/REFERENCES.md](docs/REFERENCES.md).
+`src/` is the firmware (C, pico-sdk + TinyUSB + [Pico-PIO-USB](https://github.com/sekigon-gonnoc/Pico-PIO-USB), all MIT/BSD). `tools/` has the PC helpers and a reference Windows build script (`build_modec.py`, needs `PICO_SDK_PATH`, the Arm GNU toolchain, Ninja, MSVC Build Tools; it expects this folder at `<Pico-PIO-USB>/buzz-pico-adapter` with `src/` renamed `firmware_source/`). The prebuilt UF2s are what was tested; hashes are in `firmware/SHA256_MODEC2.json`. Third-party notices: [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md), [docs/REFERENCES.md](docs/REFERENCES.md).
 
 Helper environment variables: `BUZZ_PICO_SERIAL` (pick one board if several are attached), `LIBUSB_DLL` (path of `libusb-1.0.dll` for `flash.py`).
