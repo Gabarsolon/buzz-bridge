@@ -12,6 +12,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Native test build failed.' }
     & ./build/test_native.exe
     if ($LASTEXITCODE -ne 0) { throw 'Native tests failed.' }
+    & $compilerPath -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -g -Isrc `
+        -o build/test_modec_iop.exe tests/test_modec_iop.c src/bb_core.c
+    if ($LASTEXITCODE -ne 0) { throw 'Mode C IOP host test build failed.' }
+    & ./build/test_modec_iop.exe
+    if ($LASTEXITCODE -ne 0) { throw 'Mode C IOP host tests failed.' }
 } finally {
     $env:PATH = $savedPath
     Pop-Location

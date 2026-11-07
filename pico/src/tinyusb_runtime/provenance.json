@@ -1,0 +1,14 @@
+{
+  "usbd.c": {
+    "upstream_sha256": "f15a6da11eca127b792bd04d3270e6ea3901b0a29c24f462d5687d63da1df6cb",
+    "patched_sha256": "f95a66e404b499f4f8d603c623faba3e785d0930a95c914e62c0957688cb011b"
+  },
+  "usbd_control.c": {
+    "upstream_sha256": "f22f7a5b833670e2736dbdbffc00d7cd081b934d54e191aafd25375ee2427ee3",
+    "patched_sha256": "a51a315dcff753dbc2b7c68e8fac30b3003ba7da17edf088f5a58df8bccf3078"
+  },
+  "hid_device.c": {
+    "upstream_sha256": "f5a6f34579f09388a26d52bc4afbca341047ad8fb9c7b1cdc04be7c43d36b9e4",
+    "patched_sha256": "72d8a9a35b41100b78c5b7ef46e96ef8fae26a853908043448ce3443714a4e03"
+  }
+}

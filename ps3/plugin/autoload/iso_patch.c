@@ -11,7 +11,7 @@
 typedef unsigned char byte;
 static const char *const paths[2]={"/IOP/USBD.IRX","/SYSTEM/USBD.IRX"};
 const char *const bb_setup_names[7]={"1) Buzz! buzzers only","2) Buzz! buzzers + 1 DualShock","3) 2 DualShocks, shared","4) 2 DualShocks, one player each","5) 1 DualShock, shared","6) Buzz! buzzers + 2 DualShocks (any slots)","7) More than 2 controllers (any slots)"};
-const char *const bb_layout_names[14]={"buzzers","buzzers_ds","two_ds_shared","two_ds_single","one_ds_shared","buzzers_ds2_tap1","four_ds_tap1","buzzers_ds2_tap2","eight_ds_tap12","any_buzzers_ds","any_ds4","any_2buzzers_ds","any_ds8","custom"};
+const char *const bb_layout_names[15]={"buzzers","buzzers_ds","two_ds_shared","two_ds_single","one_ds_shared","buzzers_ds2_tap1","four_ds_tap1","buzzers_ds2_tap2","eight_ds_tap12","any_buzzers_ds","any_ds4","any_2buzzers_ds","any_ds8","custom","mode_c"};
 static uint32_t le32(const byte *p){return (uint32_t)p[0]|(uint32_t)p[1]<<8|(uint32_t)p[2]<<16|(uint32_t)p[3]<<24;}
 static int bounded(uint64_t off,uint64_t n,uint64_t size){return off<=size&&n<=size-off;}
 typedef struct {uint32_t lba,size;int dir;unsigned len;char name[256];} record;
@@ -53,7 +53,7 @@ int bb_iso_inspect(const char *path,bb_iso_info *info,char *error,size_t cap){
 finish:free(module);bb_io_close(&i.file);if(rc)bb_error(error,cap,"Unexpected ISO9660 layout: need one unambiguous /IOP/USBD.IRX or /SYSTEM/USBD.IRX, plain 2048-byte sectors, bounded single extents.");return rc;
 }
 int bb_iso_config(byte *p,size_t n,const bb_iso_options *o){
- int count;size_t off=magic_offset(p,n,&count);if(count!=1||n-off<16||p[off+8]!=1||o->layout>13||o->flags>255||o->attach_ms>60000||o->heartbeat_ms>60000)return -1;
+ int count;size_t off=magic_offset(p,n,&count);if(count!=1||n-off<16||p[off+8]!=1||o->layout>14||o->flags>255||o->attach_ms>60000||o->heartbeat_ms>60000)return -1;
  unsigned packed=0;if(o->layout==13){unsigned players=2*o->pairs+o->whole+2*o->shared;if(o->pairs>2||o->whole>8||o->shared>4||players<1||players>8)return -1;packed=o->pairs+3*o->whole+27*o->shared;}
  unsigned flags=o->flags;if(o->layout>=5&&!(flags&0x30))flags|=0x10;
  if((flags&8)&&(o->layout<5||o->layout>=9||(flags&6)))return -1;
@@ -107,7 +107,7 @@ int bb_iso_restore(const char *path,int check_only,char *error,size_t cap){
  bb_iso_info i;if(bb_iso_inspect(path,&i,error,cap))return -1;char op[1024],pp[1024],sp[1024],oh[65],ph[65],sha1[41];byte *s=NULL,*orig=NULL,*patched=NULL,*cur=NULL;size_t sn,on,pn;int rc=-1;
  if(sidepaths(path,op,pp,sp)||bb_read(sp,&s,&sn,4096)||bb_read(op,&orig,&on,2*1024*1024)||bb_read(pp,&patched,&pn,2*1024*1024))goto failed;
  unsigned long long size,off;long long mtime;unsigned len,pi,layout;int used=0;
- if(sscanf((char*)s,"{\n\"format\":\"BBISO1\",\n\"image_size\":%llu,\n\"mtime\":%lld,\n\"offset\":%llu,\n\"length\":%u,\n\"path_index\":%u,\n\"layout\":%u,\n\"original_sha1\":\"%40[0-9a-f]\",\n\"original_sha256\":\"%64[0-9a-f]\",\n\"patched_sha256\":\"%64[0-9a-f]\"\n}\n%n",&size,&mtime,&off,&len,&pi,&layout,sha1,oh,ph,&used)!=9||(size_t)used!=sn||size!=i.image_size||off!=i.offset||len!=i.length||pi!=(unsigned)i.path_index||on!=len||pn!=len||layout>13||strlen(oh)!=64||strlen(ph)!=64||!bb_hash_is(orig,on,oh)||!bb_hash_is(patched,pn,ph))goto failed;
+ if(sscanf((char*)s,"{\n\"format\":\"BBISO1\",\n\"image_size\":%llu,\n\"mtime\":%lld,\n\"offset\":%llu,\n\"length\":%u,\n\"path_index\":%u,\n\"layout\":%u,\n\"original_sha1\":\"%40[0-9a-f]\",\n\"original_sha256\":\"%64[0-9a-f]\",\n\"patched_sha256\":\"%64[0-9a-f]\"\n}\n%n",&size,&mtime,&off,&len,&pi,&layout,sha1,oh,ph,&used)!=9||(size_t)used!=sn||size!=i.image_size||off!=i.offset||len!=i.length||pi!=(unsigned)i.path_index||on!=len||pn!=len||layout>14||strlen(oh)!=64||strlen(ph)!=64||!bb_hash_is(orig,on,oh)||!bb_hash_is(patched,pn,ph))goto failed;
  {byte h[20];char hs[41];bb_sha1(orig,on,h);bb_hex(h,20,hs);if(strcmp(hs,sha1)||!known_sha(hs))goto failed;}
  if(extent_read(path,&i,&cur))goto failed;
  for(size_t j=0;j<on;j++)if(cur[j]!=orig[j]&&cur[j]!=patched[j])goto failed;

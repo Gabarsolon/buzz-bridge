@@ -14,6 +14,8 @@ void vos_unlock(int state);
 void vos_call_done(vu_done_t cb, int result, int count, void *arg, void *gp);
 int vos_call_ldd(int (*fn)(int), int devId, void *gp);
 unsigned vos_sample(uint16_t src_masks[BB_NSRC]); /* buttons + valid source bit mask (idle pads included) */
+uint32_t vos_modec_sample(void);
+void vos_modec_lamps(unsigned mask); /* nonblocking mailbox, may run with interrupts suspended */
 unsigned vos_flags(void);          /* BB_FLAG_* from the patch-time configuration */
 
 #endif

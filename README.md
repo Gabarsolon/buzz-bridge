@@ -5,6 +5,7 @@ Play **Buzz!** quiz games on a PlayStation 3 and in PCSX2 with the controllers y
 | What you want | How | Folder | Download |
 |---|---|---|---|
 | **PS2 Buzz! games on a PS3 with all 4 real buzzers and working buzzer lamps, no ISO patching** (CFW only) | A modified `ps2_netemu.self` replaces the PS2 emulator file in flash. Your game images stay untouched. | [netemu/](netemu/) | `ps2_netemu.self` + install scripts (latest release) |
+| **PS2 Buzz! games on a PS3 with all 4 real buzzers and working lamps, without replacing any file in flash** (stock emulator; CFW tested) | A Raspberry Pi Pico 2 sits between the dongle and the PS3 and presents itself as one DualShock 3; the game is patched to read the buzzers from it and to send the lamps back as vibration | [pico/](pico/) | `buzz-bridge-pico-v1.4.0.zip` + `buzz-bridge-ps2.exe` (latest release) |
 | **PS2 Buzz! games with DualShocks or mixed setups** (up to 4 players, or 8 in the two-buzzer-set quiz games) | Universal patcher: a virtual Buzz! dongle fed by DualShocks and/or real buzzers. Run it on a PC, or from the Buzz! Bridge app on the PS3 (CFW) | [ps2/](ps2/) | `buzz-bridge-ps2.exe` (latest release) |
 | **PS3 Buzz! games** (Quiz TV, Quiz World, Brain of the UK …) with phones and DualShocks | A PS3 plugin, no game patching (up to 8 players) | [ps3/](ps3/) | `BuzzBridge.pkg` (latest release) |
 | **PS2 Buzz! games in PCSX2** (PC) | Phones act as buzzers through a small PC server and a virtual gamepad | [pcsx2/](pcsx2/) | Run from source (Python), see [pcsx2/README.md](pcsx2/README.md) |
@@ -18,10 +19,11 @@ Tested on one CFW PS3 slim (Evilnat 4.93 + Cobra) with a wired Namtai Buzz! dong
 - Modified `ps2_netemu.self`: all four real buzzers and the lamps (menu blink, buzz-in) work, no restart needed after installing.
 - The PS3 app on the same console: menus, the ISO list (images over 2 GB), 576i text and flicker, installing and restoring the netemu.
 - ISO patcher: Schools Quiz and all five Buzz! Junior games in PCSX2; real buzzers + 2 DualShocks on the PS3.
+- Pico adapter with the stock `ps2_netemu.self` on the same console: Buzz!: The Schools Quiz with all four buzzers and the game's own lamps (one Pico as a DualShock 3, ISO patched with layout 14).
 
 **Not tested / not supported:**
 
-- **HEN:** the netemu route cannot work on HEN (HEN cannot replace the file in flash). The PS3 app's ISO patcher is offered for CFW only. The phones/DualShock helper (`ps3/`) is untested on HEN.
+- **HEN:** the netemu route cannot work on HEN (HEN cannot replace the file in flash). The Pico adapter replaces nothing on the console, so it should work there, but it has **not** been tried on HEN. The PS3 app's ISO patcher is offered for CFW only. The phones/DualShock helper (`ps3/`) is untested on HEN.
 - Other firmware, consoles and dongles (a genuine Logitech dongle `054C:0002` is accepted by the netemu build but untested).
 - Only one dongle (four buzzers) through the netemu route. DualShock and eight-player setups go through the ISO patcher.
 

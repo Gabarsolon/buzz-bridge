@@ -1,6 +1,6 @@
 # Building and checking Buzz! Bridge PS2
 
-The Python patcher uses **Python 3.9+ standard library only**. Running it requires no PS2 SDK, C compiler or package install. The supplied `bbusbd.irx` is the 15,457-byte module copied from the universal project. Relative resource paths work both from source and inside the PyInstaller exe.
+The Python patcher uses **Python 3.9+ standard library only**. Running it requires no PS2 SDK, C compiler or package install. The supplied `bbusbd.irx` is rebuilt from this universal project, including experimental Mode C layout 14. Its current size and hash are recorded in [../MODE_C_REPORT.md](../MODE_C_REPORT.md). Relative resource paths work both from source and inside the PyInstaller exe.
 
 ## Python and module checks
 
@@ -32,6 +32,12 @@ PowerShell, from the repository root:
 ```
 
 This compiles `tests/test_native.c`, `src/bb_core.c` and `src/vusb.c` with `-std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter`. It checks layouts, USB descriptors/state, SIO2 parsing and API fuzzing; outputs stay in `universal/build/`. It does not execute IOP code or start an emulator.
+
+The same command also builds `test_modec_iop.c`, executing the actual `bbpad.c`
+against a fake SIO2 bus using `iop_mock.h`. It checks atomic analog/motor setup,
+PREPARE/COMMIT and refresh, all-off, failed setup cleanup/retry, passive reads,
+restoration of the game's request buffer and isolation of legacy layouts.
+These host tests do not establish stock netemu timing or physical lamp output.
 
 ## Rebuild the IOP module
 

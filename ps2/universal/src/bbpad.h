@@ -8,6 +8,9 @@
 int bbpad_install(void);
 void bbpad_tick(void);                        /* every worker tick: ages the snapshots */
 unsigned bbpad_sample(uint16_t masks[BB_NSRC]); /* buttons + valid sources from the last complete scan */
+uint32_t bbpad_modec_sample(void);
+void bbpad_modec_lamps(unsigned mask);
+int bbpad_modec_enabled(void);
 int bbpad_state(void);
 /* own polling (BB_FLAG_POLL_*). bbpad_poll_loop is the body of a separate thread. */
 void bbpad_poll_loop(unsigned flags);

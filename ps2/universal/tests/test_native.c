@@ -24,6 +24,8 @@ static int checks, failures;
 
 static uint16_t mock_masks[BB_NSRC];
 static unsigned mock_flags;
+static uint32_t mock_modec_word;
+static unsigned mock_modec_lamps, mock_modec_writes;
 static int gp_depth;
 static void *last_gp_seen;
 
@@ -31,6 +33,8 @@ int vos_lock(void) { return 0; }
 void vos_unlock(int s) { (void)s; }
 unsigned vos_flags(void) { return mock_flags; }
 unsigned vos_sample(uint16_t m[BB_NSRC]) { memcpy(m, mock_masks, sizeof mock_masks); return 0xFF; }
+uint32_t vos_modec_sample(void) { return mock_modec_word; }
+void vos_modec_lamps(unsigned mask) { mock_modec_lamps = mask; mock_modec_writes++; }
 void vos_call_done(vu_done_t cb, int result, int count, void *arg, void *gp)
 {
     last_gp_seen = gp;
@@ -207,7 +211,7 @@ static void test_layouts(void)
     /* layout names line up with the X-macro list */
     CHECK(strcmp(bb_layout_name(0), "buzzers") == 0);
     CHECK(strcmp(bb_layout_name(4), "one_ds_shared") == 0);
-    CHECK(BB_LAYOUT_COUNT == 14);
+    CHECK(BB_LAYOUT_COUNT == 15);
 }
 
 static void test_script(void)
@@ -1303,8 +1307,136 @@ static void test_custom_assignment(void)
     }
 }
 
+static void test_modec(void)
+{
+    uint8_t r[21] = {0xFF,0x73,0x5A,0xFF,0xFF,0x80,0x80,0x80,0x80};
+    static const unsigned axes[] = {7,8,5,6};
+    uint32_t word;
+    unsigned bit, mask, i;
+    bb_layout_t layout;
+    bb_td_t td;
+    CHECK(BB_LAYOUT_custom == 13 && BB_LAYOUT_mode_c == 14);
+    CHECK(bb_layout_build(14, &layout) == 0 && layout.ndongles == 1 && !layout.any_slots);
+    CHECK(bb_modec_decode(r, 9, 0, &word) && word == 0);
+    /* Every button, independently, including the deliberately non-linear axes. */
+    for (bit = 0; bit < 20; bit++) {
+        uint8_t rep[5];
+        if (bit < 16) r[3 + bit / 8] &= (uint8_t)~(1u << (bit % 8));
+        else r[axes[bit - 16]] = 0xE0;
+        CHECK(bb_modec_decode(r, 9, 0, &word) && word == (1u << bit));
+        bb_report_pack(word, rep);
+        CHECK((((uint32_t)rep[2] | ((uint32_t)rep[3] << 8) | ((uint32_t)(rep[4] & 15) << 16))) == (1u << bit));
+        if (bit < 16) r[3 + bit / 8] = 0xFF;
+        else r[axes[bit - 16]] = 0x80;
+    }
+    for (bit = 0; bit < 4; bit++) {
+        r[axes[bit]] = 0xAF;
+        CHECK(bb_modec_decode(r,9,0,&word) && word == 0);
+        r[axes[bit]] = 0xB0;
+        CHECK(bb_modec_decode(r,9,0,&word) && word == (1u << (16+bit)));
+        r[axes[bit]] = 0x80;
+    }
+    r[3] = r[4] = 0;
+    memset(r+5,0xE0,4);
+    CHECK(bb_modec_decode(r,9,0,&word) && word == 0xFFFFF); /* opposite directions preserved */
+    r[1] = 0x79;
+    CHECK(bb_modec_decode(r,21,0,&word) && word == 0xFFFFF);
+    CHECK(bb_modec_decode(r,9,0,&word) && word == 0xFFFFF); /* pressure prefix */
+    for (i = 0; i < 9; i++) CHECK(!bb_modec_decode(r,i,0,&word) && word == 0);
+    CHECK(!bb_modec_decode(r,21,1u<<13,&word) && !word);
+    CHECK(!bb_modec_decode(NULL,21,0,&word) && !word);
+    r[0] = 0; CHECK(!bb_modec_decode(r,21,0,&word) && !word); r[0] = 0xFF;
+    r[2] = 0; CHECK(!bb_modec_decode(r,21,0,&word) && !word); r[2] = 0x5A;
+    for (i = 0; i < 256; i++) {
+        r[1] = (uint8_t)i;
+        CHECK(bb_modec_decode(r,21,0,&word) == (i == 0x73 || i == 0x79));
+    }
+    r[1] = 0x73;
+    bb_td_reset(&td); CHECK(bb_td_add_modec(&td,4,1,85) == 0);
+    CHECK(td.in_size == 9 && td.out_size == 9 && td.in[3] == 1 && td.in[4] == 85);
+    CHECK(td.regdata[0] == 0x240940 && td.ctrl1[0] == BB_POLL_CTRL1);
+    CHECK(bb_modec_scan(td.regdata,td.in,9,r,9,0,0,&word) == 1 && word == 0xFFFFF);
+    CHECK(bb_modec_scan(td.regdata,td.in,9,r,9,0,1,&word) == -1 && !word);
+    td.regdata[0] |= 1; /* other console port never supplies Mode C */
+    CHECK(bb_modec_scan(td.regdata,td.in,9,r,9,0,0,&word) == -1);
+    td.regdata[0] &= ~3u;
+    CHECK(bb_modec_scan(td.regdata,td.in,8,r,9,0,0,&word) == 0 && !word);
+    CHECK(bb_modec_scan(td.regdata,td.in,9,r,8,0,0,&word) == 0 && !word);
+    CHECK(bb_modec_scan(td.regdata,td.in,9,r,9,1u<<13,0,&word) == 0 && !word);
+    td.in[0] = 0x81; CHECK(bb_modec_scan(td.regdata,td.in,9,r,9,0,0,&word) == -1);
+    for (i = 0; i < 4; i++) {
+        bb_td_reset(&td); CHECK(bb_td_add_modec(&td,i,0,0) == 0);
+        CHECK(td.in[0] == 1 && td.in_size == 9);
+        CHECK(td.in[1] == (i == 1 ? 0x44 : i == 2 ? 0x4D : 0x43));
+        if (i == 1) CHECK(td.in[3] == 1 && td.in[4] == 0); /* analog, unlocked */
+        if (i == 2) CHECK(!td.in[3] && td.in[4] == 1 && td.in[5] == 0xFF && td.in[8] == 0xFF);
+    }
+    /* All 16 output levels; two successful PREPARE polls, two COMMIT polls.
+     * Every mask re-strobes at 250 ms, including retry of an initial all-off. */
+    for (mask = 0; mask < 16; mask++) {
+        bb_modec_lamps_t s = {0};
+        uint8_t small, large, report[7] = {0};
+        for (i = 0; i < 4; i++) if (mask & (1u<<i)) report[i+1] = 0xFF;
+        CHECK(bb_modec_lamp_mask(report) == mask);
+        for (i = 0; i < 4; i++) {
+            bb_modec_lamp_next(&s,mask,100+i*16,&small,&large);
+            CHECK(small == (i >= 2) && large == 17*mask);
+            bb_modec_lamp_sent(&s);
+        }
+        bb_modec_lamp_next(&s,mask,349,&small,&large);
+        CHECK(small == 1 && large == 17*mask && s.phase == 4);
+        bb_modec_lamp_next(&s,mask,350,&small,&large);
+        CHECK(small == 0 && large == 17*mask);
+        /* A changed mask restarts PREPARE, even in mid-COMMIT; clear uses the same pair. */
+        bb_modec_lamp_next(&s,mask^15,351,&small,&large);
+        CHECK(!small && large == 17*(mask^15));
+        bb_modec_lamp_next(&s,0,352,&small,&large);
+        CHECK(!small && !large);
+    }
+    {
+        bb_modec_lamps_t s = {0}; uint8_t small,large;
+        bb_modec_lamp_next(&s,9,0xFFFFFF00u,&small,&large);
+        /* Failed polls do not consume a phase. */
+        bb_modec_lamp_next(&s,9,0xFFFFFF10u,&small,&large);
+        CHECK(!small && s.phase == 0);
+        bb_modec_lamp_sent(&s); bb_modec_lamp_sent(&s);
+        bb_modec_lamp_next(&s,9,0xFFFFFF20u,&small,&large); CHECK(small == 1);
+        bb_modec_lamp_next(&s,9,0x90u,&small,&large); /* 400 ms across wrap */
+        CHECK(!small && large == 153 && s.phase == 0);
+    }
+    /* Exercise the actual virtual USB route, including repeated reports,
+     * malformed output, detach clear and isolation from legacy layouts. */
+    {
+        vu_setup_t setup = {0x21,9,0x0200,0,7};
+        uint8_t report[7] = {0,0xFF,0,0xFF,0,0,0};
+        mb_reset(); mock_modec_word = 0x81234; mock_modec_writes = 0;
+        vusb_init(0,100,14,0); vusb_register_ldd(&ldd,&fake_gp_a); ticks(5);
+        CHECK(!memcmp(vusb_stats()->last_report[0],"\x7F\x7F\x34\x12\xF8",5));
+        for (i = 0; i < 2; i++) {
+            CHECK(vusb_transfer(mb.ep0,report,7,&setup,NULL,NULL,NULL) == 0);
+            ticks(1);
+            CHECK(mock_modec_lamps == 5 && mock_modec_writes == i+1);
+        }
+        setup.length = 6;
+        vusb_transfer(mb.ep0,report,7,&setup,NULL,NULL,NULL); ticks(1);
+        CHECK(mock_modec_writes == 2);
+        setup.length = 7; setup.value = 0x0100;
+        vusb_transfer(mb.ep0,report,7,&setup,NULL,NULL,NULL); ticks(1);
+        CHECK(mock_modec_writes == 2);
+        setup.value = 0x0200; memset(report,0,7);
+        vusb_transfer(mb.ep0,report,7,&setup,NULL,NULL,NULL); ticks(1);
+        CHECK(!mock_modec_lamps && mock_modec_writes == 3);
+        vusb_detach(); CHECK(!mock_modec_lamps && mock_modec_writes == 4);
+        mock_modec_writes = 0; mb_reset();
+        vusb_init(0,100,0,0); vusb_register_ldd(&ldd,&fake_gp_a); ticks(5);
+        vusb_transfer(mb.ep0,report,7,&setup,NULL,NULL,NULL); ticks(1);
+        vusb_detach(); CHECK(mock_modec_writes == 0);
+    }
+}
+
 int main(void)
 {
+    test_modec();
     test_any_assignment();
     test_custom_assignment();
     test_descriptors();

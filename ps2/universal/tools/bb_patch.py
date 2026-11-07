@@ -43,6 +43,7 @@ EMBEDDED_LAYOUTS = [
     (11, 'any_2buzzers_ds', '2 pairs of Buzz! buzzers + DualShocks on any slots (8 players)'),
     (12, 'any_ds8', 'DualShocks on any slots (up to 8 players)'),
     (13, 'custom', 'More than 2 controllers (any slots): buzzer pairs, whole and shared DualShocks'),
+    (14, 'mode_c', 'Mode C pad: Pico on port 1, four handsets and game lamps (experimental)'),
 ]
 MULTITAP_LAYOUTS = (5, 6, 7, 8, 9, 10, 11, 12)
 KNOWN_USBD = {
@@ -259,6 +260,7 @@ MENU = (
     (4, '1 DualShock, shared', 2, None),
     (13, 'Buzz! buzzers + 2 DualShocks (any slots)', 4, (1, 2, 0)),
     (13, 'More than 2 controllers (any slots)', '1-8', None),
+    (14, 'Mode C pad (Pico, game lamps, experimental)', 4, None),
 )
 
 
@@ -498,7 +500,7 @@ def cmd_patch(args):
         console.custom_setup(*counts)
     else:
         console.setup(layout)
-    if (layout == 13 or layout in MULTITAP_LAYOUTS) and args.poll == 'off':
+    if (layout in (13, 14) or layout in MULTITAP_LAYOUTS) and args.poll == 'off':
         # The module reads multitap slots B-D itself; that needs its own pad poll.
         flags |= FLAG_POLL_AUTO
         args.poll = 'auto'
@@ -648,7 +650,7 @@ def main(argv=None, console=None):
     dest = ap.add_mutually_exclusive_group()
     dest.add_argument('--out', help='path for patched copy (default: <name> (Buzz Bridge).iso)')
     dest.add_argument('--in-place', action='store_true', help='modify input instead of creating a copy')
-    ap.add_argument('--layout', help='0-12 or name; omit to choose your setup interactively')
+    ap.add_argument('--layout', help='0-12 or 14 (mode_c), or name; 13 uses custom count options; omit for menu')
     ap.add_argument('--buzzer-pairs', type=int, help='custom: 0-2 pairs (omitted counts default to 0)')
     ap.add_argument('--whole-ds', type=int, help='custom: 0-8 DualShocks, one person each')
     ap.add_argument('--shared-ds', type=int, help='custom: 0-4 DualShocks, two people each')

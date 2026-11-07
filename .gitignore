@@ -1,6 +1,8 @@
 # Build artifacts
 dist/
+deliverables/
 build/
+tests/ui_preview/
 *.spec
 
 # Python
@@ -41,3 +43,4 @@ ps3/console_backup/
 *.self
 *.bnp
 local_only/
+pico/tools/dumps/

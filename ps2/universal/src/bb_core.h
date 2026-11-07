@@ -99,6 +99,25 @@ unsigned bb_layout_taps(const bb_layout_t *lay, uint8_t slots[BB_PORTS]);
 /* The 5 byte interrupt-IN report: 7F 7F b0 b1 (b2 | F0). Idle = 7F 7F 00 00 F0. */
 void bb_report_pack(uint32_t word20, uint8_t out[BB_REPORT_LEN]);
 
+/* Mode C uses only console port 1, slot A. Invalid/truncated/digital replies
+ * release ALL bits; pressure replies may supply their first nine bytes. */
+int bb_modec_decode(const uint8_t *reply, unsigned len, uint32_t status, uint32_t *word);
+/* -2 = short analog poll (ignore, do not refresh); -1 = no selected source
+ * read; 0 = bad read; 1 = valid analog read. */
+int bb_modec_scan(const uint32_t reg[16], const uint8_t *in, unsigned ni,
+                  const uint8_t *out, unsigned no, uint32_t status, unsigned slot, uint32_t *word);
+unsigned bb_modec_lamp_mask(const uint8_t report[BB_OUT_REPORT_LEN]);
+
+typedef struct {
+    uint32_t started_ms;
+    uint8_t started, mask, phase; /* 0,1 PREPARE; 2,3 COMMIT; 4 idle */
+} bb_modec_lamps_t;
+/* Call next immediately BEFORE sending; advance only after a successful poll.
+ * Wall-clock time, wrap safe. A stalled session restarts PREPARE after 400 ms. */
+void bb_modec_lamp_next(bb_modec_lamps_t *s, unsigned mask, uint32_t ms,
+                       uint8_t *small, uint8_t *large);
+void bb_modec_lamp_sent(bb_modec_lamps_t *s);
+
 /* Demo generator for the diagnostic mode: handset (n/5)%4 colour n%5 is held 500 ms of every 1000 ms. */
 uint32_t bb_script_word(uint32_t ms);
 
@@ -153,6 +172,9 @@ enum { BB_TDK_PAD = 1, BB_TDK_TAPSEL = 2, BB_TDK_TAPDET = 3 };
 
 void bb_td_reset(bb_td_t *td);
 int bb_td_add_pad_read(bb_td_t *td, unsigned port);              /* 01 42 00 00 00 on SIO2 port 0/1 */
+/* Nine-byte standard pad/config command, port 1 only. Steps: 0 enter config,
+ * 1 analog unlocked, 2 motor map, 3 leave config, 4 analog poll. */
+int bb_td_add_modec(bb_td_t *td, unsigned step, uint8_t small, uint8_t large);
 int bb_td_add_tap_select(bb_td_t *td, unsigned port, unsigned slot); /* 21 21 slot 00 00 00 00 on SIO2 port 2/3 */
 int bb_td_add_tap_detect(bb_td_t *td, unsigned port);            /* 21 12 00 00 00 00 on SIO2 port 2/3 */
 /* Reply checks accept PCSX2's 80/5A header and netemu's FF-filled header with
@@ -168,7 +190,7 @@ int bb_tap_select_reply_ok(const uint8_t *out, uint32_t len, unsigned slot);
 #define BB_FLAG_DIAG_TAP 0x08 /* hold Select on a tapped port's A pad: status colour on its last used slot */
 #define BB_FLAG_POLL_AUTO   0x10 /* read the pads ourselves when nobody else has polled for 500 ms */
 #define BB_FLAG_POLL_ALWAYS 0x20 /* read the pads ourselves all the time (diagnostic) */
-/* A layout that uses multitap slots starts the poll thread by itself, whatever the poll flags say. */
+/* Slot layouts and Mode C start their service thread regardless of poll flags. */
 
 typedef struct {
     char magic[8];
@@ -176,7 +198,7 @@ typedef struct {
     uint8_t layout;        /* BB_LAYOUT_* */
     uint8_t flags;         /* BB_FLAG_* */
     uint8_t reserved;      /* layout 13 only: P + 3*W + 27*S, P<=2 W<=8 S<=4;
-                           * require 1 <= 2*P+W+2*S <= 8. Ignored for IDs 0-12.
+                           * require 1 <= 2*P+W+2*S <= 8. Ignored for other IDs.
                            * Version, magic, timings and 16-byte size unchanged. */
     uint16_t attach_delay_ms;
     uint16_t heartbeat_ms;

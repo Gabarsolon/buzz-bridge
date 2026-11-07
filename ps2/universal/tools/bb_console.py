@@ -91,6 +91,12 @@ class Console:
             self.pending = False
 
     def setup(self, layout):
+        if layout == 14:
+            self.line('\nSelected: Mode C pad (experimental).')
+            self.line('Clean Mode C Pico assigned to pad port 1: all four handsets and game lamps.')
+            self.line('Rumble probe must be OFF. Keep this pad dedicated to the buzzers.')
+            self.line('Analog mode and lamp refresh are managed automatically.')
+            return
         descriptions = (
             'Port 1: wired buzzer handsets 1-2 (PS3 mapping).',
             'Port 1: buzzer handsets 1-2. Port 2: players 3-4 split.',

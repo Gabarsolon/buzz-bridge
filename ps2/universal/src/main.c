@@ -57,6 +57,8 @@ void vos_unlock(int st) { CpuResumeIntr(st); }
 unsigned vos_flags(void) { return bb_cfg.flags; }
 
 unsigned vos_sample(uint16_t masks[BB_NSRC]) { return bbpad_sample(masks); }
+uint32_t vos_modec_sample(void) { return bbpad_modec_sample(); }
+void vos_modec_lamps(unsigned mask) { bbpad_modec_lamps(mask); }
 
 /* gpcall.S: runs fn(a, b, c) with the client's $gp and puts our own back afterwards */
 extern int bb_call3(void *fn, void *gp, int a, int b, int c);
@@ -216,7 +218,7 @@ int _start(int ac, char *av[], void *startaddr, ModuleInfo_t *mi)
         DeleteThread(tid);
         return MODULE_NO_RESIDENT_END;
     }
-    if (((flags & (BB_FLAG_POLL_AUTO | BB_FLAG_POLL_ALWAYS)) || bbpad_taps_wanted()) &&
+    if (((flags & (BB_FLAG_POLL_AUTO | BB_FLAG_POLL_ALWAYS)) || bbpad_taps_wanted() || bbpad_modec_enabled()) &&
         !(flags & (BB_FLAG_NOPAD | BB_FLAG_SCRIPT))) {
         /* the poll thread blocks inside SIO2MAN's session handshake, so it must not be the USB worker */
         th.attr = TH_C;

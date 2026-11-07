@@ -6,3 +6,6 @@ mkdir -p build
 gcc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -g -Isrc -o build/test_native.exe \
     tests/test_native.c src/bb_core.c src/vusb.c
 ./build/test_native.exe
+gcc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter -g -Isrc -o build/test_modec_iop.exe \
+    tests/test_modec_iop.c src/bb_core.c
+./build/test_modec_iop.exe

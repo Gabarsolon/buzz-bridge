@@ -87,6 +87,9 @@ int bb_layout_build(unsigned id, bb_layout_t *out)
         return 0;
     }
     switch (id) {
+    case BB_LAYOUT_mode_c:
+        /* A validated 20-bit analog snapshot bypasses the legacy 16-bit bindings. */
+        return 0;
     case BB_LAYOUT_buzzers:
         bind(&out->h[0], P1, netemu_h1, 0);
         bind(&out->h[1], P1, netemu_h2, 0);
@@ -315,6 +318,81 @@ uint32_t bb_script_word(uint32_t ms)
     return pressed ? ((uint32_t)1 << (handset * BZ_COUNT + colour)) : 0;
 }
 
+int bb_modec_decode(const uint8_t *r, unsigned len, uint32_t status, uint32_t *word)
+{
+    *word = 0;
+    if (!r || len < 9 || (status & (1u << 13)) || r[0] != 0xFF ||
+        (r[1] != 0x73 && r[1] != 0x79) || r[2] != 0x5A)
+        return 0;
+    *word = ((~r[3]) & 255u) | (((~r[4]) & 255u) << 8) |
+            ((uint32_t)(r[7] >= 0xB0) << 16) | ((uint32_t)(r[8] >= 0xB0) << 17) |
+            ((uint32_t)(r[5] >= 0xB0) << 18) | ((uint32_t)(r[6] >= 0xB0) << 19);
+    return 1;
+}
+
+int bb_modec_scan(const uint32_t reg[16], const uint8_t *in, unsigned ni,
+                  const uint8_t *out, unsigned no, uint32_t status, unsigned slot, uint32_t *word)
+{
+    unsigned i, a = 0, b = 0;
+    int result = -1;
+    *word = 0;
+    if (!in || !out)
+        return -1;
+    for (i = 0; i < 16 && reg[i]; i++) {
+        unsigned p = reg[i] & 3, il = (reg[i] >> 8) & 511, ol = (reg[i] >> 18) & 511;
+        if (a + il > ni || b + ol > no)
+            return 0; /* malformed descriptors cannot preserve a stale press */
+        if (p == 0 && !slot && il >= 3 && in[a] == 1 && in[a + 1] == 0x42) {
+            /* A game's five-byte discovery poll may still run after we enable
+             * analog mode. It must not erase a complete own-poll snapshot or
+             * extend its lifetime without supplying axes. */
+            if (!(status & (1u << 13)) && ol >= 3 && ol < 9 && out[b] == 0xFF &&
+                (out[b + 1] == 0x73 || out[b + 1] == 0x79) && out[b + 2] == 0x5A)
+                result = -2;
+            else
+                result = bb_modec_decode(out + b, ol, status, word);
+        }
+        if (p == 2 && il >= 3 && in[a] == 0x21 && in[a + 1] == 0x21 &&
+            !(status & (1u << 13)) && bb_tap_select_reply_ok(out + b, ol, in[a + 2]))
+            slot = in[a + 2];
+        a += il;
+        b += ol;
+    }
+    return result;
+}
+
+unsigned bb_modec_lamp_mask(const uint8_t report[BB_OUT_REPORT_LEN])
+{
+    unsigned i, mask = 0;
+    for (i = 0; i < 4; i++)
+        if (report[i + 1])
+            mask |= 1u << i;
+    return mask;
+}
+
+void bb_modec_lamp_next(bb_modec_lamps_t *s, unsigned mask, uint32_t ms,
+                       uint8_t *small, uint8_t *large)
+{
+    mask &= 15;
+    if (!s->started || s->mask != mask ||
+        (s->phase < 4 && (uint32_t)(ms - s->started_ms) >= 400) ||
+        (s->phase == 4 && (uint32_t)(ms - s->started_ms) >= 250)) {
+        s->started = 1;
+        s->started_ms = ms;
+        s->mask = (uint8_t)mask;
+        s->phase = 0;
+    }
+    /* Keep the consumed COMMIT in idle: no stray PREPARE or mismatched zero. */
+    *small = s->phase >= 2;
+    *large = (uint8_t)(17 * s->mask);
+}
+
+void bb_modec_lamp_sent(bb_modec_lamps_t *s)
+{
+    if (s->phase < 4)
+        s->phase++;
+}
+
 /* ---- SIO2 pad transfer parsing ---- */
 
 int bb_sio2_scan_ex(const uint32_t regdata[16], const uint8_t *in, uint32_t in_size,
@@ -444,6 +522,30 @@ int bb_td_add_pad_read(bb_td_t *td, unsigned port)
     td->ctrl1[port] = BB_POLL_CTRL1;
     td->ctrl2[port] = BB_POLL_CTRL2;
     td_entry(td, port, BB_POLL_CMD_LEN, BB_TDK_PAD, port, 0);
+    return 0;
+}
+
+int bb_td_add_modec(bb_td_t *td, unsigned step, uint8_t small, uint8_t large)
+{
+    unsigned i;
+    uint8_t *b;
+    if (step > 4 || !td_room(td, 9))
+        return -1;
+    b = td->in + td->in_size;
+    for (i = 0; i < 9; i++) b[i] = 0;
+    b[0] = 1;
+    b[1] = step == 1 ? 0x44 : step == 2 ? 0x4D : step == 4 ? 0x42 : 0x43;
+    if (step < 2) b[3] = 1; /* enter config / select analog, no lock */
+    if (step == 2) {
+        b[3] = 0; b[4] = 1; /* small, large in poll bytes 3,4 */
+        for (i = 5; i < 9; i++) b[i] = 0xFF;
+    }
+    if (step == 3)
+        for (i = 4; i < 9; i++) b[i] = 0x5A;
+    if (step == 4) { b[3] = small; b[4] = large; }
+    td->ctrl1[0] = BB_POLL_CTRL1;
+    td->ctrl2[0] = BB_POLL_CTRL2;
+    td_entry(td, 0, 9, BB_TDK_PAD, 0, 0);
     return 0;
 }
 

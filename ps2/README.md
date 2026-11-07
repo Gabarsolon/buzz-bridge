@@ -75,7 +75,7 @@ Restoration refuses wrong checksums, changed extents and unrelated USBD edits. R
 
 ## Setups and controller buttons
 
-Menu choices are **1-7**. Entries 1-5 retain their original mappings. Entry 6 is the ready-made setup for Buzz! buzzers + 2 DualShocks (4 players). Entry 7 asks about your controllers:
+Menu choices are **1-8**. Entries 1-5 retain their original mappings. Entry 6 is the ready-made setup for Buzz! buzzers + 2 DualShocks (4 players). Entry 7 asks about your controllers. Entry 8 selects the Pico Mode C pad:
 
 | Menu | Setup | Players |
 |---|---|---|
@@ -86,10 +86,29 @@ Menu choices are **1-7**. Entries 1-5 retain their original mappings. Entry 6 is
 | 5 | 1 DualShock, shared | 2 |
 | 6 | Buzz! buzzers + 2 DualShocks (any slots) | 4 |
 | 7 | More than 2 controllers (any slots) | 1-8 |
+| 8 | Mode C pad (Pico adapter, game lamps) | 4 |
 
 For entry 7 the patcher asks how many **pairs of Buzz! buzzers** you have (0-2; a Buzz! set with 4 buzzers counts as 1 pair because on a PS3 only 2 of its 4 buzzers work) and how many **DualShocks** you have (each question shows its default), then lists every way you can play with them and you pick one. Every DualShock you share (left half = one player, right half = another) adds one player, up to 8. For example, with 1 pair of buzzers and 3 DualShocks you can play with 5, 6, 7 or 8 players. The tool then shows a summary and the button tables.
 
-No extra hardware is needed: the patch reads the emulator's controller slots. On PS3, assign controllers with the PS button as usual. In PCSX2, enable its built-in multitap setting under **Settings > Controllers > Global Settings** for the console ports you use, then set their A-D slots to DualShock 2. More than four players need a game that uses two buzzer sets, such as Schools Quiz; the Junior games and The Music Quiz have four-player limits.
+For entries 1-7, no extra hardware is needed: the patch reads the emulator's controller slots. On PS3, assign controllers with the PS button as usual. In PCSX2, enable its built-in multitap setting under **Settings > Controllers > Global Settings** for the console ports you use, then set their A-D slots to DualShock 2. More than four players need a game that uses two buzzer sets, such as Schools Quiz; the Junior games and The Music Quiz have four-player limits.
+
+Entry 8 / **layout 14, `mode_c`** requires a Pico running clean Mode C
+(054C:0268) with **rumble probe off**, assigned to controller port 1/A. It reads
+all 20 buzzer bits from one analog pad and forwards the game's lamp reports
+through encoded motor commands. The module enables analog mode and the motor
+map itself. Its dedicated service runs every 16 ms even while the game reads
+pads; `--poll off` is promoted to `auto`. Keep this pad dedicated to the Pico;
+ordinary controllers and game rumble are unsuitable for this protocol.
+IDs 0-13 retain their mappings and configuration format.
+
+```powershell
+python buzz_bridge_ps2.py "My Game.iso" --layout mode_c --poll auto --out "My Game (Mode C).iso"
+```
+
+Tested on one CFW PS3 with the stock netemu: all four handsets and the game's own
+lamps work in Buzz!: The Schools Quiz. Not tried on HEN or with other games.
+No netemu patch is required. See [MODE_C_REPORT.md](MODE_C_REPORT.md)
+for setup, test steps, analog-mode and PADMAN limitations.
 
 The command-line equivalent uses counts with **no `--layout`**; omitted counts default to zero:
 

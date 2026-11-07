@@ -152,6 +152,19 @@ class PatcherTests(unittest.TestCase):
         self.assertEqual(parsed, [(i, n) for i, n, _ in bb_patch.EMBEDDED_LAYOUTS])
         self.assertEqual([(i, n) for i, n, _ in bb_patch.load_layouts()], parsed)
 
+    def test_modec_layout_cli_and_menu(self):
+        p, meta = self.iso(name='modec_source.iso')
+        for selector in ('14', 'mode_c', None):
+            target = os.path.join(self.tmp, 'modec_%s.iso' % selector)
+            opts = ['--out', target, '--poll', 'off']
+            if selector is not None:
+                opts += ['--layout', selector]
+            rc, so, se = run(p, *opts, input_text=['8'] if selector is None else None)
+            self.assertEqual(rc, 0, so + se)
+            cfg = bb_patch.read_config(rd(target)[meta['usbd_lba'] * SECTOR:])
+            self.assertEqual((cfg['layout'], cfg['flags']), (14, 0x11))
+            self.assertEqual(bb_patch.read_config(rd(IRX))['layout'], 0) # shipped default unchanged
+
     def test_any_slot_layouts(self):
         p, meta = self.iso(name='any.iso')
         for layout, name in ((9, 'any_buzzers_ds'), (10, 'any_ds4'), (11, 'any_2buzzers_ds'), (12, 'any_ds8')):
@@ -353,7 +366,7 @@ class SafetyTests(unittest.TestCase):
         rc, so, se = run(self.p, input_text=['1'])
         self.assertEqual(rc, 0, se)
         rows = [l for l in so.splitlines() if l[:3].strip().rstrip(')').isdigit() and ' players' in l]
-        self.assertEqual(len(rows), 7)
+        self.assertEqual(len(rows), 8)
         self.assertEqual(len(set(l.index(' players') for l in rows)), 1, rows)
 
     def test_custom_wizard_defaults_and_all_menu_choices(self):

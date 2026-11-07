@@ -1,12 +1,13 @@
 # CLAUDE.md: Buzz! Bridge
 
-Public repo `Gabarsolon/buzz-bridge` (MIT). Lets PS2 Buzz! games take real buzzers, phones or DualShocks on a PS3 CFW/HEN console (and PCSX2). Latest release: **v1.3.0** (tag at `9d757e5`). Owner: Gabarsolon, own console (PS3 slim CECH-25xx, Evilnat 4.93 + Cobra, webMAN MOD, `192.168.0.169`).
+Public repo `Gabarsolon/buzz-bridge` (MIT). Lets PS2 Buzz! games take real buzzers, phones or DualShocks on a PS3 CFW/HEN console (and PCSX2). Latest release: **v1.4.0** (Pico adapter + layout 14; v1.3.0 tag at `9d757e5`). Owner: Gabarsolon, own console (PS3 slim CECH-25xx, Evilnat 4.93 + Cobra, webMAN MOD, `192.168.0.169`).
 
 ## Layout
 
 - `ps2/`: PC ISO patcher (`buzz_bridge_ps2.py`, menu entries 1-7 incl. 6 = buzzers + 2 DualShocks) and the PS2-side payloads; `buzz-bridge-ps2.exe` is built from it.
 - `ps3/`: PS3 app `BuzzBridge.pkg` (PS3DK C, CMake+Ninja): `README.md`, `DESIGN.md`, `PORTING.md`, `build_ps3.ps1`; `plugin/`, `payloads/`, `assets/`.
 - `netemu/`: install/restore scripts (`.ps1` + `.sh`) for the modified `ps2_netemu.self` and README.
+- `pico/`: Pico 2 adapter firmware (`src/`), prebuilt UF2s (`firmware/`), PC helpers (`tools/`), docs. Mode C = one DualShock 3 clone carrying 4 handsets + game lamps (vibration code); needs the ISO patched with layout 14 (`mode_c`, menu entry 8). Tested on CFW + stock netemu, HEN untested.
 - `pcsx2/`: PCSX2 side.
 - `tests/`: `run_all.py` (14 groups: C unit tests for the app flow/browser/installer/menu, Python tests for features/UI layout/hashes/simple netemu).
 - `tools/`: helpers.
@@ -47,7 +48,7 @@ Public repo `Gabarsolon/buzz-bridge` (MIT). Lets PS2 Buzz! games take real buzze
 
 ## Known limits and open items
 
-- HEN: cannot replace the netemu; ISO patching gives two handsets only (stock emulator delivers 12 buttons per pad: usages 13..20 dropped). Ideas not done: second dongle, Pico adapter.
+- HEN: cannot replace the netemu; ISO patching gives two handsets only (stock emulator delivers 12 buttons per pad: usages 13..20 dropped). Fix: the Pico adapter in `pico/` (Mode C), untested on HEN.
 - Console freeze: whole PS3 froze once after ~10 min idle in the app (earlier build). Not confirmed fixed; heartbeat log `/dev_hdd0/tmp/buzzbridge_heartbeat.log` (ask the user for it if it recurs).
 - libc `stat()` drops files > 2 GiB: use `sysLv2FsStat`.
 - New SIO2 frame shapes froze the console twice, unexplained; only use proven shapes.

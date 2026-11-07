@@ -12,5 +12,5 @@ int bb_iso_patch(const char *path,const char *module,const bb_iso_options *optio
 int bb_iso_restore(const char *path,int check_only,char *error,size_t cap);
 int bb_iso_config(unsigned char *module,size_t n,const bb_iso_options *options);
 extern const char *const bb_setup_names[7];
-extern const char *const bb_layout_names[14];
+extern const char *const bb_layout_names[];
 #endif

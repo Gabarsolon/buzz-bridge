@@ -55,7 +55,7 @@ class Features(unittest.TestCase):
             for length in (34985,34993,35009):
                 src,_=self.fixture('src-%s-%d.iso'%(folder,length),folder,length)
                 original=src.read_bytes()
-                for layout in range(14):
+                for layout in range(15):
                     name='%s-%d-%d'%(folder,length,layout)
                     c=self.base/(name+'-c.iso');p=self.base/(name+'-py.iso');c.write_bytes(original)
                     counts=(1,2,0) if layout==13 else None

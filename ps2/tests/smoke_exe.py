@@ -51,6 +51,7 @@ def main():
 
         invoke(['--help'], 0, '--whole-ds')
         invoke(['--list-layouts'], 0, 'custom')
+        invoke(['--list-layouts'], 0, '14  mode_c')
         invoke([iso, '--info'], 0, 'UNKNOWN version')
         # Unknown refusal occurs after the bundled module's structural checks,
         # proving that frozen imports and the embedded IRX are resolved.
@@ -65,7 +66,7 @@ def main():
         invoke([str(work / 'archive.zip') + '\\Game.iso', '--info'], 1, extraction)
         invoke([work / 'Missing.iso'], 1, extraction, stdin='\n')
         invoke([], 1, 'Press Enter to close.', stdin='"%s"\n\n' % iso)
-    print('13 frozen-exe smoke checks passed (synthetic ISO only).')
+    print('14 frozen-exe smoke checks passed (synthetic ISO only).')
 
 
 if __name__ == '__main__':

@@ -17,6 +17,9 @@
  * Pattern: ps2sdk mx4sio_bd ioplib.c (library lookup, re-link the import stubs of modules that are already
  * linked) and OPL pademu (wrapper calls the saved original, then works on the sio2_transfer_data_t);
  * PADMAN's own call order 46 / 51 / 52; freemtap's multitap commands (research/MULTITAP_NOTES.md). IOP only. */
+#ifdef BBPAD_HOST_TEST
+#include "../tests/iop_mock.h"
+#else
 #include <types.h>
 #include <irx.h>
 #include <loadcore.h>
@@ -24,6 +27,7 @@
 #include <sio2man.h>
 #include <thbase.h>
 #include <stdio.h>
+#endif
 
 #include "bb_core.h"
 #include "bbpad.h"
@@ -57,6 +61,68 @@ static unsigned custom_slots, restore_blocked; /* custom only: isolate a port wi
 static volatile u32 scan_snap[BB_NSRC]; /* publish one complete ordered scan, never a partial A/B batch */
 static unsigned tap_selected_mask; /* include attempted selections whose acknowledgement may be lost */
 
+/* Dedicated Mode C source: port 1/A only. USB writes merely publish desired
+ * lamps. The poll thread owns setup/sequencing; hooks only overlay motor bytes. */
+static unsigned modec;
+static volatile u32 modec_snap, modec_age;
+static volatile unsigned modec_desired, modec_ready, modec_motors;
+static volatile u32 modec_gamecfg_ms;
+static volatile unsigned modec_gamecfg_seen;
+static bb_modec_lamps_t modec_lamps;
+
+static u32 modec_now_ms(void)
+{
+    iop_sys_clock_t t;
+    u32 sec, usec;
+    GetSystemTime(&t);
+    SysClock2USec(&t, &sec, &usec);
+    return sec * 1000u + usec / 1000u;
+}
+
+static void modec_take(sio2_transfer_data_t *td, unsigned slot)
+{
+    u32 word;
+    int r = bb_modec_scan(td->regdata, td->in, td->in_size, td->out, td->out_size,
+                         td->stat6c, slot, &word);
+    if (r >= 0) {
+        modec_snap = r ? 0x80000000u | word : 0;
+        modec_age = 0;
+    }
+}
+
+typedef struct { unsigned off; u8 small, large; } modec_saved_t;
+
+/* Called inside the caller's existing SIO2 session. Never changes descriptors,
+ * reply bytes or command sizes. Restore the caller's request buffer afterwards.
+ * Configuration belongs to the game until it has been quiet for 500 ms. */
+static unsigned modec_overlay(sio2_transfer_data_t *td, modec_saved_t saved[16])
+{
+    unsigned i, a = 0, n = 0, slot = passive_slot[0];
+    u8 *in = td ? td->in : NULL;
+    if (!in) return 0;
+    for (i = 0; i < 16 && td->regdata[i]; i++) {
+        unsigned reg = td->regdata[i], p = reg & 3, len = (reg >> 8) & 511;
+        if (a + len > td->in_size) break;
+        /* Conservatively follow attempted selections before their reply. */
+        if (p == 2 && len >= 3 && in[a] == 0x21 && in[a + 1] == 0x21)
+            slot = in[a + 2];
+        if (p == 0 && !slot && len >= 3 && in[a] == 1) {
+            if (in[a + 1] != 0x42) {
+                modec_ready = 0;
+                modec_gamecfg_ms = modec_now_ms();
+                modec_gamecfg_seen = 1;
+            } else if (len >= 5 && modec_ready) {
+                unsigned motors = modec_motors;
+                saved[n].off = a;
+                saved[n].small = in[a + 3]; saved[n].large = in[a + 4]; n++;
+                in[a + 3] = (u8)motors; in[a + 4] = (u8)(motors >> 8);
+            }
+        }
+        a += len;
+    }
+    return n;
+}
+
 typedef int (*sio2_xfer_fn)(sio2_transfer_data_t *td);
 static sio2_xfer_fn real_a, real_b;
 
@@ -75,6 +141,8 @@ static void observe(sio2_transfer_data_t *td)
     hook_calls++;
     if (!td || !td->in || !td->out)
         return;
+    if (modec)
+        modec_take(td, passive_slot[0]);
     if ((td->stat6c >> 13) & 1) /* transfer error flag, PADMAN discards the data too */
         return;
     n = bb_sio2_scan_ex(td->regdata, td->in, td->in_size, td->out, td->out_size, ev, passive_slot);
@@ -86,18 +154,25 @@ static void observe(sio2_transfer_data_t *td)
         passive_age = 0;
 }
 
-static int hook_a(sio2_transfer_data_t *td)
+static int hooked_transfer(sio2_xfer_fn real, sio2_transfer_data_t *td)
 {
-    int r = real_a(td);
+    modec_saved_t saved[16];
+    unsigned i, n = modec ? modec_overlay(td, saved) : 0;
+    int r = real(td);
+    for (i = 0; i < n; i++) {
+        u8 *in = td->in;
+        in[saved[i].off + 3] = saved[i].small;
+        in[saved[i].off + 4] = saved[i].large;
+    }
     observe(td);
     return r;
 }
 
+static int hook_a(sio2_transfer_data_t *td) { return hooked_transfer(real_a, td); }
+
 static int hook_b(sio2_transfer_data_t *td)
 {
-    int r = real_b(td);
-    observe(td);
-    return r;
+    return hooked_transfer(real_b, td);
 }
 
 static iop_library_t *find_lib(const char *name)
@@ -115,7 +190,7 @@ static iop_library_t *find_lib(const char *name)
     return NULL;
 }
 
-#define J_FOR(addr) (0x08000000u | ((((u32)(addr)) << 4) >> 6))
+#define J_FOR(addr) (0x08000000u | ((((u32)(uintptr_t)(addr)) << 4) >> 6))
 
 /* Rewrites every import stub that currently jumps to oldf so it jumps to newf. */
 static void relink_stubs(iop_library_t *lib, void *oldf, void *newf)
@@ -183,6 +258,7 @@ int bbpad_install(void)
 void bbpad_tick(void)
 {
     unsigned i;
+    if (modec_age < 0xFFFFFFF0u) modec_age++;
     if (passive_age < 0xFFFFFFF0u)
         passive_age++;
     if (state == 1 && installed_ticks < 0xFFFFFFF0u)
@@ -223,6 +299,14 @@ unsigned bbpad_sample(uint16_t masks[BB_NSRC])
     }
     return present;
 }
+
+uint32_t bbpad_modec_sample(void)
+{
+    return modec && (modec_snap & 0x80000000u) && modec_age < AGE_LIMIT_TICKS ?
+           modec_snap & 0xFFFFFu : 0;
+}
+void bbpad_modec_lamps(unsigned mask) { if (modec) modec_desired = mask & 15; }
+int bbpad_modec_enabled(void) { return modec; }
 
 int bbpad_state(void) { return state; }
 unsigned bbpad_hook_calls(void) { return hook_calls; }
@@ -266,6 +350,72 @@ static u32 send_td(void)
     ptd.out_dma.addr = 0;
     real_b(&ptd);
     return ptd.stat6c;
+}
+
+static unsigned modec_send(unsigned step, u8 small, u8 large)
+{
+    bb_td_reset(&btd);
+    bb_td_add_modec(&btd, step, small, large);
+    return send_td();
+}
+
+static int modec_config_reply(unsigned status)
+{
+    return !(status & (1u << 13)) && pout[0] == 0xFF && pout[1] == 0xF3 && pout[2] == 0x5A;
+}
+
+static void modec_session(unsigned flags)
+{
+    static unsigned attempted;
+    static u32 last_setup;
+    unsigned status, ok, need_analog;
+    u32 now, word;
+    u8 small, large;
+
+    real_begin(); /* may wait for PADMAN; never called on the USB worker */
+    now = modec_now_ms();
+    if (passive_slot[0] || (modec_gamecfg_seen && (u32)(now - modec_gamecfg_ms) < 500)) {
+        real_end();
+        return;
+    }
+    if (!modec_ready) {
+        if (attempted && (u32)(now - last_setup) < 1000) {
+            real_end();
+            return;
+        }
+        attempted = 1; last_setup = now;
+        /* Complete bounded setup in ONE session so PADMAN never sees F3.
+         * Always attempt exit even when an earlier command fails. No sleeps. */
+        status = modec_send(0, 0, 0);
+        need_analog = pout[1] != 0x73 && pout[1] != 0x79;
+        ok = !(status & (1u << 13)) && pout[0] == 0xFF && pout[2] == 0x5A &&
+             (pout[1] == 0x41 || pout[1] == 0x73 || pout[1] == 0x79 || pout[1] == 0xF3);
+        /* Preserve an already analog/pressure pad's 4F pressure settings.
+         * 44 is necessary only for a digital pad (or abandoned config mode). */
+        if (ok && need_analog) ok = modec_config_reply(modec_send(1, 0, 0));
+        if (ok) ok = modec_config_reply(modec_send(2, 0, 0));
+        if (!modec_config_reply(modec_send(3, 0, 0))) ok = 0;
+        modec_lamps.started = 0;
+        if (!ok) {
+            modec_snap = 0;
+            real_end();
+            return;
+        }
+        modec_ready = 1;
+        if (flags & BB_FLAG_VERBOSE)
+            printf("BBUSB: Mode C port 1: analog mode and motor map configured\n");
+    }
+    /* Get time AFTER session acquisition/setup, not before a blocking begin. */
+    bb_modec_lamp_next(&modec_lamps, modec_desired, modec_now_ms(), &small, &large);
+    modec_motors = (unsigned)small | ((unsigned)large << 8);
+    status = modec_send(4, small, large);
+    ok = bb_modec_decode(pout, 9, status, &word);
+    modec_snap = ok ? 0x80000000u | word : 0;
+    modec_age = 0;
+    if (ok) bb_modec_lamp_sent(&modec_lamps);
+    else modec_ready = 0; /* disconnect, mode changed, or transport failure */
+    poll_count++;
+    real_end();
 }
 
 /* pad read entries of the transfer just made -> snapshots of (port, slot) */
@@ -439,6 +589,10 @@ void bbpad_configure(unsigned layout_id, unsigned flags)
     bb_layout_t lay;
     unsigned p;
 
+    modec = layout_id == BB_LAYOUT_mode_c && !(flags & (BB_FLAG_NOPAD | BB_FLAG_SCRIPT));
+    modec_snap = modec_ready = modec_desired = modec_motors = 0;
+    modec_age = AGE_LIMIT_TICKS;
+
     if (bb_layout_build(layout_id, &lay) != 0)
         bb_layout_build(BB_LAYOUT_buzzers, &lay);
     bb_layout_taps(&lay, tap_wanted);
@@ -476,6 +630,13 @@ void bbpad_poll_loop(unsigned flags)
         iter++;
         if (state != 1 || !real_begin || !real_end || installed_ticks < POLL_GRACE_TICKS) {
             polling = 0;
+            continue;
+        }
+        if (modec) {
+            /* Mode C always needs its dedicated service, even --poll off or
+             * active game reads: analog axes and the lamp lease require it. */
+            polling = 1;
+            modec_session(flags);
             continue;
         }
         need_a = poll_a_enabled && (mode_always || passive_age >= POLL_IDLE_TICKS);

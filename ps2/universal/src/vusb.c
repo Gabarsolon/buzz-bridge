@@ -165,6 +165,8 @@ static void abort_pending(int id, int dev)
 static void drop_device_locked(int d)
 {
     int k;
+    if (vu.layout_id == BB_LAYOUT_mode_c && d == 0)
+        vos_modec_lamps(0);
     abort_pending(0, d);
     for (k = VU_MAXDEV; k < MAXPIPE; k++) {
         if (vu.pipes[k].dev == d && vu.pipes[k].type != PT_NONE) {
@@ -405,6 +407,10 @@ static int control_request(int d, const vu_setup_t *su, uint8_t *data, uint32_t 
             if (mem_diff(tmp, vu.st.lights[d], sizeof tmp))
                 vu.st.lights_updates++;
             mem_copy(vu.st.lights[d], tmp, sizeof tmp);
+            if (vu.layout_id == BB_LAYOUT_mode_c && d == 0 && data &&
+                n == BB_OUT_REPORT_LEN && su->length == BB_OUT_REPORT_LEN &&
+                su->value == 0x0200 && su->index == 0 && tmp[0] == 0)
+                vos_modec_lamps(bb_modec_lamp_mask(tmp));
             *count = n;
             return VU_RC_OK;
         }
@@ -610,6 +616,10 @@ static void deliver_input(void)
         masks[i] = 0;
     if (vu.flags & BB_FLAG_SCRIPT) {
         word[0] = bb_script_word(vu.tick * VU_TICK_MS);
+        for (d = 1; d < VU_MAXDEV; d++)
+            word[d] = 0;
+    } else if (vu.layout_id == BB_LAYOUT_mode_c) {
+        word[0] = vos_modec_sample();
         for (d = 1; d < VU_MAXDEV; d++)
             word[d] = 0;
     } else {
