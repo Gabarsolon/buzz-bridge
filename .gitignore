@@ -44,3 +44,4 @@ ps3/console_backup/
 *.bnp
 local_only/
 pico/tools/dumps/
+!netemu/ps2_netemu.self
